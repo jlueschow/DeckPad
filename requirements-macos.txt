@@ -1,0 +1,3 @@
+# macOS-spezifische Abhängigkeiten (zusätzlich zu requirements.txt)
+pyobjc-framework-Cocoa>=10.0    # AppKit, NSApplication
+pyobjc-framework-Quartz>=10.0   # Quartz, CGEvent

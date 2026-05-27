@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# PyInstaller artefacts
+*.spec.bak
+*.manifest
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# User data (config, custom buttons, library pages)
+data/config.json
+data/library/pages/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test artefacts
+*.log
+scan_result_*.json
+
+# Windows registry export artefacts (project-specific legacy files)
+HKEY_CURRENT_USER*/
+HKEY_*
+Profile Ajazz Software/
+
+# Credentials / secrets
+*.env
+secrets.py

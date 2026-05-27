@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "categories": [
+    {
+      "id": "controller",
+      "name": "App-Steuerung",
+      "buttons": [
+        {"id": "open_config", "label": "Einstellungen", "icon": {"type": "file", "path": "assets/icons/open_config.png"}, "action": {"type": "open_config"}}
+      ]
+    },
+    {
+      "id": "system",
+      "name": "System",
+      "buttons": [
+        {"id": "vol_up",     "label": "Vol +",             "icon": {"type": "file", "path": "assets/icons/vol_up.png"},        "action": {"type": "shortcut", "keys": "f12"}},
+        {"id": "vol_down",   "label": "Vol -",             "icon": {"type": "file", "path": "assets/icons/vol_down.png"},      "action": {"type": "shortcut", "keys": "f11"}},
+        {"id": "mute",       "label": "Mute",              "icon": {"type": "file", "path": "assets/icons/mute.png"},          "action": {"type": "shortcut", "keys": "f10"}},
+        {"id": "bright_up",  "label": "Hell +",            "icon": {"type": "file", "path": "assets/icons/bright_up.png"},     "action": {"type": "shortcut", "keys": "f2"}},
+        {"id": "bright_dn",  "label": "Hell -",            "icon": {"type": "file", "path": "assets/icons/bright_dn.png"},     "action": {"type": "shortcut", "keys": "f1"}},
+        {"id": "screenshot", "label": "Screenshot",        "icon": {"type": "file", "path": "assets/icons/screenshot.png"},    "action": {"type": "shortcut", "keys": "cmd+shift+4"}},
+        {"id": "lock",       "label": "Sperren",           "icon": {"type": "file", "path": "assets/icons/lock.png"},          "action": {"type": "shortcut", "keys": "cmd+ctrl+q"}},
+        {"id": "mission",    "label": "Mission Ctrl",      "icon": {"type": "file", "path": "assets/icons/mission.png"},       "action": {"type": "shortcut", "keys": "ctrl+up"}},
+        {"id": "spotlight",  "label": "Spotlight",         "icon": {"type": "file", "path": "assets/icons/spotlight.png"},     "action": {"type": "shortcut", "keys": "cmd+space"}},
+        {"id": "desktop",    "label": "Desktop",           "icon": {"type": "file", "path": "assets/icons/desktop.png"},       "action": {"type": "shortcut", "keys": "cmd+f3"}},
+        {"id": "lock_screen","label": "Bildschirm sperren","icon": {"type": "file", "path": "assets/icons/lock_screen.png"},   "action": {"type": "shortcut", "keys": "cmd+ctrl+q"}},
+        {"id": "logout",     "label": "Abmelden",          "icon": {"type": "file", "path": "assets/icons/logout.png"},        "action": {"type": "shell", "command": "osascript -e 'tell application \"System Events\" to log out'"}},
+        {"id": "restart",    "label": "Neustarten",        "icon": {"type": "file", "path": "assets/icons/restart.png"},       "action": {"type": "shell", "command": "osascript -e 'tell application \"System Events\" to restart'"}},
+        {"id": "shutdown",   "label": "Ausschalten",       "icon": {"type": "file", "path": "assets/icons/shutdown.png"},      "action": {"type": "shell", "command": "osascript -e 'tell application \"System Events\" to shut down'"}}
+      ]
+    },
+    {
+      "id": "media",
+      "name": "Medien",
+      "buttons": [
+        {"id": "play_pause", "label": "Play/Pause", "icon": {"type": "file", "path": "assets/icons/play_pause.png"},  "action": {"type": "shortcut", "keys": "f8"}},
+        {"id": "next_track", "label": "Weiter",     "icon": {"type": "file", "path": "assets/icons/next_track.png"},  "action": {"type": "shortcut", "keys": "f9"}},
+        {"id": "prev_track", "label": "Zurück",     "icon": {"type": "file", "path": "assets/icons/prev_track.png"},  "action": {"type": "shortcut", "keys": "f7"}},
+        {"id": "stop",       "label": "Stop",       "icon": {"type": "file", "path": "assets/icons/stop_media.png"},  "action": {"type": "shortcut", "keys": "f8"}}
+      ]
+    },
+    {
+      "id": "editing",
+      "name": "Bearbeiten",
+      "buttons": [
+        {"id": "undo",       "label": "Undo",        "icon": {"type": "file", "path": "assets/icons/undo.png"},       "action": {"type": "shortcut", "keys": "cmd+z"}},
+        {"id": "redo",       "label": "Redo",        "icon": {"type": "file", "path": "assets/icons/redo.png"},       "action": {"type": "shortcut", "keys": "cmd+shift+z"}},
+        {"id": "copy",       "label": "Kopieren",    "icon": {"type": "file", "path": "assets/icons/copy.png"},       "action": {"type": "shortcut", "keys": "cmd+c"}},
+        {"id": "paste",      "label": "Einfügen",    "icon": {"type": "file", "path": "assets/icons/paste.png"},      "action": {"type": "shortcut", "keys": "cmd+v"}},
+        {"id": "cut",        "label": "Ausschneiden","icon": {"type": "file", "path": "assets/icons/cut.png"},        "action": {"type": "shortcut", "keys": "cmd+x"}},
+        {"id": "save",       "label": "Speichern",   "icon": {"type": "file", "path": "assets/icons/save.png"},       "action": {"type": "shortcut", "keys": "cmd+s"}},
+        {"id": "find",       "label": "Suchen",      "icon": {"type": "file", "path": "assets/icons/find.png"},       "action": {"type": "shortcut", "keys": "cmd+f"}},
+        {"id": "new_tab",    "label": "Neuer Tab",   "icon": {"type": "file", "path": "assets/icons/new_tab.png"},    "action": {"type": "shortcut", "keys": "cmd+t"}},
+        {"id": "close_tab",  "label": "Tab zu",      "icon": {"type": "file", "path": "assets/icons/close_tab.png"},  "action": {"type": "shortcut", "keys": "cmd+w"}}
+      ]
+    }
+  ]
+}

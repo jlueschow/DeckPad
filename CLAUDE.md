@@ -1,0 +1,79 @@
+# DeckPad — Projektkontext für Claude
+
+## Was ist das?
+
+**DeckPad** — macOS/Windows Menu-Bar-App für den AJAZZ AKP03E Macro-Pad.
+6 Buttons + 3 Knobs + 3 Nav-Buttons. Konfigurierbar über ein Tray-Icon-Menü
+und ein Konfigurations-Fenster.
+
+## Tech-Stack
+
+- Python 3 + **PySide6** (migriert von PyQt6)
+- HIDAPI für Gerätekommunikation
+- Pillow für Icon-Rendering auf dem Gerät
+- PyObjC (pyobjc-framework-Cocoa/Quartz) auf macOS
+- pyautogui auf Windows
+
+## Architektur
+
+```
+app_main.py          — Einstiegspunkt, QApplication zuerst (!)
+app/menu_bar.py      — MenuBarApp: QSystemTrayIcon + Signalverdrahtung
+app/config_window.py — Konfigurationsfenster (Szenen, Knobs, Buttons, Settings)
+app/hid_thread.py    — HIDThread (Main-Thread, SIGBUS-sicher), _run_action
+app/button_editor.py — ButtonEditorDialog, KnobEditorDialog, NavButtonEditorDialog
+app/scene_widget.py  — SceneWidget: visuelle Darstellung einer Szene
+app/library_panel.py — ButtonGridWidget: Button-Bibliothek
+app/log_window.py    — LogWindow: Echtzeit-Ereignis-Log (Singleton)
+app/styles.py        — Globales Stylesheet (Dark Mode)
+actions.py           — Plattformübergreifende Aktionen (shortcuts, media, apps)
+log_sink.py          — Globaler Log-Kanal (Signal-basiert, thread-safe)
+config/config_manager.py — ConfigManager: config.json laden/speichern
+autostart.py         — Autostart bei Login (macOS launchd / Windows Registry)
+```
+
+## Bekannte macOS-Fallstricke in diesem Projekt
+
+### 1. Emoji-Bug (Bus Error) → siehe ~/.claude/CLAUDE.md
+Kein Farb-Emoji (U+1F000+) in Qt-Widgets oder QMenu-Items.
+**Sichere Symbole im Menü:** `⬤ ⚙ ✓ ✕ ☰ ✦ ▶ ◀`
+
+### 2. QApplication zuerst
+`app_main.py` importiert alle App-Module erst NACH `QApplication()` — immer
+so beibehalten.
+
+### 3. SIGBUS / NSMenu-Rebuild
+`_rebuild_menu()` darf nicht sofort in `_on_menu_hidden()` aufgerufen werden
+(GC zerstört QActions vor triggered). Delay: `QTimer.singleShot(200, ...)`.
+
+### 4. HID-Polling pausieren
+`pause_polling()` / `resume_polling()` in `aboutToShow` / `aboutToHide` —
+niemals HIDAPI im Background-Thread aufrufen.
+
+### 5. NSWindowCollectionBehaviorMoveToActiveSpace
+Fenster via `winId()` → NSView → `.window()` auf den aktuellen macOS-Space
+bringen (nicht per Titel-Lookup — race-prone).
+
+## Aktueller Stand (Mai 2026)
+
+### Fertig
+- Grundfunktion: Buttons, Knobs (drehen + drücken), Nav-Buttons
+- Konfigurationsfenster: Szenen, Button-Editor, Knob-Editor, Settings
+- Button-Bibliothek (library_panel + in ButtonEditorDialog + KnobEditorDialog)
+- Autostart (macOS launchd / Windows Registry)
+- Knob-Druck-Aktion (press_action) — vollständig implementiert
+- Ereignis-Log-Fenster (LogWindow + log_sink)
+- Media-Key-Fix: f7–f12 → NX_KEYTYPE via _post_media_key_macos()
+- PySide6-Migration (von PyQt6)
+- Windows-Kompatibilität (actions.py plattform-aware)
+
+### Ausstehend (Phase 3)
+- App-Bundle bauen (PyInstaller) — nächster geplanter Schritt
+- Scroll-Aktion für Knob (TODO in hid_thread.py)
+
+## Daten
+
+- Config: `data/config.json`
+- Button-Bibliothek: `data/library/buttons.json`
+- Seiten-Bibliothek: `data/library/pages/`
+- Autostart-Plist (macOS): `~/Library/LaunchAgents/app.deckpad.plist`

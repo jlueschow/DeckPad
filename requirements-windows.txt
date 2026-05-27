@@ -1,0 +1,2 @@
+# Windows-spezifische Abhängigkeiten (zusätzlich zu requirements.txt)
+pyautogui>=0.9.54               # Shortcuts und Media-Keys
