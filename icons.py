@@ -21,7 +21,7 @@ def _find_icns(app_path: str) -> str | None:
     Findet die Haupt-.icns-Datei eines .app-Bundles.
     Strategie 1: CFBundleIconFile / CFBundleIconName aus Info.plist
     Strategie 2: Erste .icns-Datei in Contents/Resources als Fallback
-    Gibt None zurück wenn nichts gefunden.
+    Gibt None zurück wenn nichts gefunden (z. B. Asset-Katalog-only Apps).
     """
     resources_dir = os.path.join(app_path, "Contents", "Resources")
 
@@ -49,6 +49,8 @@ def _find_icns(app_path: str) -> str | None:
                 return os.path.join(resources_dir, name)
 
     return None
+
+
 
 
 def _load_via_sips(icns_path: str) -> "Image.Image | None":
