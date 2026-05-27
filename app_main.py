@@ -62,6 +62,17 @@ def main():
     from config.config_manager import _init_user_data
     _init_user_data()   # Nutzerdaten-Verzeichnis beim ersten Start anlegen (Bundle)
 
+    # ── Library-Icons generieren falls nicht vorhanden ────────────────────────
+    # SF-Symbol-Icons werden lokal aus macOS generiert (nicht in Git eingecheckt,
+    # da SF Symbols urheberrechtlich geschützt sind). create_library_icons nutzt
+    # AppKit → Import erst nach QApplication erlaubt.
+    try:
+        from create_library_icons import icons_exist, generate_icons
+        if not icons_exist():
+            generate_icons(silent=True)
+    except Exception:
+        pass  # Icons fehlen → Bibliothek zeigt Fallback-Text, App läuft trotzdem
+
     from app.menu_bar import MenuBarApp
 
     # ── Menu-Bar-App starten ──────────────────────────────────────────────────

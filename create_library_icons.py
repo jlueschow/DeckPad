@@ -6,10 +6,16 @@ Workflow:
   1. SF Symbol via AppKit auf transparentem Canvas rendern
   2. Alpha-Kanal als Maske extrahieren → Symbol in Weiß umfärben
   3. Auf farbigen, abgerundeten Hintergrund (PIL) compositen
-  4. Als PNG in assets/icons/ speichern
+  4. Als PNG im angegebenen Verzeichnis speichern
 
-Ausführen:
+Ausführen (manuell oder vor pyinstaller):
     python3 create_library_icons.py
+
+Rechtlicher Hinweis:
+  SF Symbols sind urheberrechtlich geschützt (Apple Inc.).
+  Die generierten Icons dürfen nicht in öffentliche Git-Repositories
+  eingecheckt werden. Sie werden lokal generiert und verbleiben auf
+  dem jeweiligen Rechner (assets/icons/ ist in .gitignore).
 """
 
 import io
@@ -170,28 +176,50 @@ def make_icon(filename: str, symbol_name: str, bg_rgb: tuple) -> bytes:
     return buf.getvalue()
 
 
-# ── Main ───────────────────────────────────────────────────────────────────────
+# ── Öffentliche API ────────────────────────────────────────────────────────────
 
-def main():
-    os.makedirs(ICONS_DIR, exist_ok=True)
+def generate_icons(icons_dir: str = None, silent: bool = False) -> bool:
+    """
+    Generiert alle Icons in icons_dir (Standard: assets/icons/ im Projektordner).
+    Gibt True zurück wenn alle Icons erfolgreich generiert wurden.
+    Kann aus app_main.py aufgerufen werden (nach QApplication, Hauptthread).
+    """
+    out_dir = icons_dir or ICONS_DIR
+    os.makedirs(out_dir, exist_ok=True)
     total = len(ICONS)
     ok    = 0
 
-    print(f"Generiere {total} Icons in {ICONS_DIR}\n")
+    if not silent:
+        print(f"Generiere {total} Icons in {out_dir}\n")
+
     for filename, symbol, bg in ICONS:
-        path = os.path.join(ICONS_DIR, filename)
+        path = os.path.join(out_dir, filename)
         try:
             data = make_icon(filename, symbol, bg)
             with open(path, "wb") as f:
                 f.write(data)
-            size_kb = len(data) / 1024
-            print(f"  ✓  {filename:<30}  {size_kb:4.1f} kB")
+            if not silent:
+                print(f"  ✓  {filename:<30}  {len(data)/1024:4.1f} kB")
             ok += 1
         except Exception as exc:
-            print(f"  ✗  {filename}: {exc}")
+            if not silent:
+                print(f"  ✗  {filename}: {exc}")
 
-    print(f"\n{ok}/{total} erfolgreich.")
+    if not silent:
+        print(f"\n{ok}/{total} erfolgreich.")
+    return ok == total
 
+
+def icons_exist(icons_dir: str = None) -> bool:
+    """Gibt True zurück wenn mindestens die Hälfte der Icons bereits vorhanden ist."""
+    out_dir = icons_dir or ICONS_DIR
+    if not os.path.isdir(out_dir):
+        return False
+    existing = sum(1 for f, _, _ in ICONS if os.path.exists(os.path.join(out_dir, f)))
+    return existing >= len(ICONS) // 2
+
+
+# ── CLI ────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    main()
+    generate_icons(silent=False)

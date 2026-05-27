@@ -32,6 +32,18 @@ config/config_manager.py — ConfigManager: config.json laden/speichern
 autostart.py         — Autostart bei Login (macOS launchd / Windows Registry)
 ```
 
+## Copyright-Regel (IMMER beachten)
+
+**Vor jedem Commit und bei jeder Verwendung von Grafiken, Symbolen oder Icons prüfen:**
+
+- SF Symbols (Apple) → lokal generieren, **nie in Git einchecken** (`assets/icons/` ist in `.gitignore`)
+- App-Icons aus `.app`-Bundles (z. B. Calendar.app) → ebenfalls nicht einchecken
+- Drittanbieter-Icons (App-Logos etc.) → nur verwenden wenn Lizenz es erlaubt
+- Bei Unsicherheit über die Nutzungsrechte: **immer zuerst nachfragen**
+
+Icons in diesem Projekt werden beim ersten App-Start automatisch generiert
+(`create_library_icons.py` → AppKit/SF Symbols → lokal, nicht auf GitHub).
+
 ## Bekannte macOS-Fallstricke in diesem Projekt
 
 ### 1. Emoji-Bug (Bus Error) → siehe ~/.claude/CLAUDE.md
