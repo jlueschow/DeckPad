@@ -73,6 +73,14 @@ ICONS = [
     ("prev_track.png",    "backward.end.fill",                  ( 20,  80,  40)),
     ("stop_media.png",    "stop.fill",                          ( 80,  20,  20)),
 
+    # ── Logic Pro spezifisch ──────────────────────────────────────────────────
+    ("logic_record.png",  "record.circle.fill",                 (130,  15,  15)),
+    ("logic_solo.png",    "headphones",                         (130,  90,  10)),
+    ("logic_new.png",     "plus.rectangle.fill",                ( 20,  80,  40)),
+    ("logic_open.png",    "folder.fill",                        ( 20,  60, 130)),
+    ("logic_movie.png",   "film.fill",                          ( 70,  30, 110)),
+    ("logic_import.png",  "waveform.badge.plus",                ( 20,  80,  80)),
+
     # ── Bearbeiten ─────────────────────────────────────────────────────────────
     ("undo.png",          "arrow.uturn.backward",               ( 60,  60,  60)),
     ("redo.png",          "arrow.uturn.forward",                ( 60,  60,  60)),

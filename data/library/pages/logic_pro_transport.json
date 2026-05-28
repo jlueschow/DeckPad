@@ -1,0 +1,106 @@
+{
+    "id": "logic_pro_transport",
+    "name": "Logic Pro - Transport",
+    "description": "Transport, Mute, Solo und Aufnahme für Logic Pro (importiert aus SDProfile)",
+    "buttons": [
+        {
+            "index": 1,
+            "label": "Anfang",
+            "icon": {
+                "type": "file",
+                "path": "assets/icons/prev_track.png"
+            },
+            "action": {
+                "type": "shortcut",
+                "keys": "return"
+            }
+        },
+        {
+            "index": 2,
+            "label": "Start/Stopp",
+            "icon": {
+                "type": "file",
+                "path": "assets/icons/play_pause.png"
+            },
+            "action": {
+                "type": "shortcut",
+                "keys": "space"
+            }
+        },
+        {
+            "index": 3,
+            "label": "Aufnahme",
+            "icon": {
+                "type": "file",
+                "path": "assets/icons/logic_record.png"
+            },
+            "action": {
+                "type": "shortcut",
+                "keys": "r"
+            }
+        },
+        {
+            "index": 4,
+            "label": "Mute",
+            "icon": {
+                "type": "file",
+                "path": "assets/icons/mute.png"
+            },
+            "action": {
+                "type": "shortcut",
+                "keys": "m"
+            }
+        },
+        {
+            "index": 5,
+            "label": "Solo",
+            "icon": {
+                "type": "file",
+                "path": "assets/icons/logic_solo.png"
+            },
+            "action": {
+                "type": "shortcut",
+                "keys": "s"
+            }
+        },
+        {
+            "index": 6,
+            "label": "Record Rep.",
+            "icon": {
+                "type": "file",
+                "path": "assets/icons/logic_record.png"
+            },
+            "action": {
+                "type": "shortcut",
+                "keys": "ctrl+r"
+            }
+        }
+    ],
+    "knobs": [
+        {
+            "index": 1,
+            "label": "Lautstärke",
+            "action": {
+                "type": "volume"
+            }
+        },
+        {
+            "index": 2,
+            "label": "Marker",
+            "action": {
+                "type": "shortcut_turn",
+                "key_ccw": ",",
+                "key_cw": "."
+            }
+        },
+        {
+            "index": 3,
+            "label": "Spur",
+            "action": {
+                "type": "shortcut_turn",
+                "key_ccw": "up",
+                "key_cw": "down"
+            }
+        }
+    ]
+}

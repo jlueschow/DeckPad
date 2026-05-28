@@ -19,9 +19,13 @@ build/
 venv/
 env/
 
-# User data (config, custom buttons, library pages)
+# User data (config, persönliche Seiten — nicht einzuchecken)
 data/config.json
-data/library/pages/
+# Alle Seiten-Presets ignorieren ...
+data/library/pages/*
+# ... außer diesen generischen App-Presets (öffentlich, kein personenbez. Inhalt):
+!data/library/pages/logic_pro_transport.json
+!data/library/pages/logic_pro_files.json
 
 # Lokal generierte Icons (SF Symbols, urheberrechtlich geschützt — nicht einzuchecken)
 # Werden beim ersten App-Start automatisch generiert (create_library_icons.py).

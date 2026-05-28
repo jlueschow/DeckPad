@@ -1,0 +1,106 @@
+{
+    "id": "logic_pro_files",
+    "name": "Logic Pro - Dateien",
+    "description": "Datei-Operationen für Logic Pro (importiert aus SDProfile)",
+    "buttons": [
+        {
+            "index": 1,
+            "label": "Neu",
+            "icon": {
+                "type": "file",
+                "path": "assets/icons/logic_new.png"
+            },
+            "action": {
+                "type": "shortcut",
+                "keys": "cmd+n"
+            }
+        },
+        {
+            "index": 2,
+            "label": "Öffnen",
+            "icon": {
+                "type": "file",
+                "path": "assets/icons/logic_open.png"
+            },
+            "action": {
+                "type": "shortcut",
+                "keys": "cmd+o"
+            }
+        },
+        {
+            "index": 3,
+            "label": "Schließen",
+            "icon": {
+                "type": "file",
+                "path": "assets/icons/close_tab.png"
+            },
+            "action": {
+                "type": "shortcut",
+                "keys": "cmd+w"
+            }
+        },
+        {
+            "index": 4,
+            "label": "Speichern",
+            "icon": {
+                "type": "file",
+                "path": "assets/icons/save.png"
+            },
+            "action": {
+                "type": "shortcut",
+                "keys": "cmd+s"
+            }
+        },
+        {
+            "index": 5,
+            "label": "Film öffnen",
+            "icon": {
+                "type": "file",
+                "path": "assets/icons/logic_movie.png"
+            },
+            "action": {
+                "type": "shortcut",
+                "keys": "cmd+alt+o"
+            }
+        },
+        {
+            "index": 6,
+            "label": "Audio import",
+            "icon": {
+                "type": "file",
+                "path": "assets/icons/logic_import.png"
+            },
+            "action": {
+                "type": "shortcut",
+                "keys": "cmd+i"
+            }
+        }
+    ],
+    "knobs": [
+        {
+            "index": 1,
+            "label": "Lautstärke",
+            "action": {
+                "type": "volume"
+            }
+        },
+        {
+            "index": 2,
+            "label": "Marker",
+            "action": {
+                "type": "shortcut_turn",
+                "key_ccw": ",",
+                "key_cw": "."
+            }
+        },
+        {
+            "index": 3,
+            "label": "Spur",
+            "action": {
+                "type": "shortcut_turn",
+                "key_ccw": "up",
+                "key_cw": "down"
+            }
+        }
+    ]
+}
