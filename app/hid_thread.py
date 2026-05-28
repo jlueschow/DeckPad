@@ -316,6 +316,21 @@ def _run_action(action: dict):
     elif atype == "shell":
         import subprocess
         subprocess.Popen(action.get("command", ""), shell=True)
+    elif atype == "dante_route":
+        dante_cfg = cfg.get().get("dante", {})
+        try:
+            result = actions.dante_route(
+                rx_device=action.get("rx_device", ""),
+                rx_channel=action.get("rx_channel", 1),
+                tx_device=action.get("tx_device", ""),
+                tx_channel=action.get("tx_channel", ""),
+                host=dante_cfg.get("host", ""),
+                api_key=dante_cfg.get("api_key", ""),
+            )
+            log(f"dante_route ▶ {result}")
+        except Exception as e:
+            log(f"dante_route ▶ FEHLER: {e}")
+            print(f"[dante_route] Fehler: {e}")
 
 
 def _run_knob_action(action: dict, direction: int):

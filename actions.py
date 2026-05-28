@@ -328,3 +328,80 @@ def send_shortcut(keys: str):
         _send_shortcut_macos(keys)
     else:
         _send_shortcut_windows(keys)
+
+
+# ── Dante DDM Routing ──────────────────────────────────────────────────────────
+
+def dante_route(rx_device: str, rx_channel: int,
+                tx_device: str, tx_channel: str,
+                host: str, api_key: str) -> str:
+    """
+    Setzt eine Dante-Audio-Route via DDM GraphQL API.
+
+    1. Sucht die UUID des RX-Geräts per Name-Lookup.
+    2. Setzt die Subscription via DeviceRxChannelsSubscriptionSet-Mutation.
+
+    Auth: Authorization: <RAW_KEY>  (kein "Bearer"-Prefix!)
+    User-Agent muss PostmanRuntime/7.45.0 sein (DDM-Anforderung).
+
+    Returns: Status-String für Logging.
+    Raises:  ValueError / RuntimeError / urllib.error.URLError bei Fehler.
+    """
+    import urllib.request
+    import urllib.error
+    import json as _json
+
+    if not host or not api_key:
+        raise ValueError("Dante DDM: Host oder API-Key nicht konfiguriert.")
+
+    _headers = {
+        "Content-Type": "application/json",
+        "Authorization": api_key,
+        "User-Agent": "PostmanRuntime/7.45.0",
+    }
+
+    def _ddm(query: str, variables: dict = None) -> dict:
+        url = f"{host.rstrip('/')}/graphql"
+        payload: dict = {"query": query}
+        if variables:
+            payload["variables"] = variables
+        data = _json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers=_headers, method="POST")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            result = _json.loads(resp.read().decode("utf-8"))
+        if "errors" in result:
+            raise RuntimeError(result["errors"][0]["message"])
+        return result.get("data", {})
+
+    # ── Schritt 1: RX-Geräte-UUID auflösen ────────────────────────────────────
+    devices_data = _ddm("{ domains { name devices { id name } } }")
+    rx_id = None
+    for domain in devices_data.get("domains", []):
+        for dev in domain["devices"]:
+            if dev["name"] == rx_device:
+                rx_id = dev["id"]
+                break
+        if rx_id:
+            break
+
+    if not rx_id:
+        raise ValueError(f"Dante: RX-Gerät '{rx_device}' nicht gefunden.")
+
+    # ── Schritt 2: Route setzen ────────────────────────────────────────────────
+    _ddm("""
+    mutation($input: DeviceRxChannelsSubscriptionSetInput!) {
+      DeviceRxChannelsSubscriptionSet(input: $input) { __typename }
+    }
+    """, {
+        "input": {
+            "deviceId": rx_id,
+            "subscriptions": [{
+                "rxChannelIndex": rx_channel,
+                "subscribedDevice": tx_device,
+                "subscribedChannel": tx_channel,
+            }]
+        }
+    })
+
+    log(f"dante_route ▶ {tx_device}/{tx_channel!r} → {rx_device} RX {rx_channel}")
+    return f"Route gesetzt: {tx_device}/{tx_channel!r} → {rx_device} RX {rx_channel}"

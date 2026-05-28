@@ -26,6 +26,7 @@ ACTION_TYPES = [
     ("open_url",       "URL öffnen"),
     ("shortcut",       "Tastenkürzel"),
     ("shell",          "Terminal-Befehl"),
+    ("dante_route",    "Dante Routing"),
     ("open_config",    "Einstellungen öffnen"),
     ("none",           "Keine Aktion"),
 ]
@@ -273,14 +274,40 @@ class ButtonEditorDialog(QDialog):
         sh_l.addRow("Befehl:", self._act_cmd)
         self._action_stack.addWidget(sh_w)
 
-        # 4: open_config
+        # 4: dante_route
+        dante_w = QWidget()
+        dante_l = QFormLayout(dante_w)
+        dante_l.setSpacing(10)
+        dante_l.setContentsMargins(0, 4, 0, 4)
+        self._act_dante_rx_dev = QLineEdit()
+        self._act_dante_rx_dev.setPlaceholderText("z. B. 7-313-NIO500-A16")
+        self._act_dante_rx_ch = QSpinBox()
+        self._act_dante_rx_ch.setRange(1, 64)
+        self._act_dante_rx_ch.setValue(1)
+        self._act_dante_tx_dev = QLineEdit()
+        self._act_dante_tx_dev.setPlaceholderText("z. B. 7-313-NIO500-A8D8")
+        self._act_dante_tx_ch = QLineEdit()
+        self._act_dante_tx_ch.setPlaceholderText("z. B. arthur mix L")
+        dante_hint = QLabel(
+            "DDM-Host und API-Key in Einstellungen → Dante DDM konfigurieren."
+        )
+        dante_hint.setWordWrap(True)
+        dante_hint.setStyleSheet("color: #8E8E93; font-size: 11px;")
+        dante_l.addRow("RX Ger\xe4t:", self._act_dante_rx_dev)
+        dante_l.addRow("RX Kanal:", self._act_dante_rx_ch)
+        dante_l.addRow("TX Ger\xe4t:", self._act_dante_tx_dev)
+        dante_l.addRow("TX Kanal:", self._act_dante_tx_ch)
+        dante_l.addRow("", dante_hint)
+        self._action_stack.addWidget(dante_w)
+
+        # 5: open_config
         cfg_w = QWidget()
         cfg_l = QVBoxLayout(cfg_w)
         cfg_l.setContentsMargins(0, 4, 0, 4)
         cfg_l.addWidget(QLabel("Öffnet das Konfigurationsfenster der App."))
         self._action_stack.addWidget(cfg_w)
 
-        # 5: none
+        # 6: none
         none_w = QWidget()
         none_l = QVBoxLayout(none_w)
         none_l.setContentsMargins(0, 4, 0, 4)
@@ -479,6 +506,10 @@ class ButtonEditorDialog(QDialog):
             self._act_url.setText(action.get("url", ""))
             self._act_keys.setText(action.get("keys", ""))
             self._act_cmd.setText(action.get("command", ""))
+            self._act_dante_rx_dev.setText(action.get("rx_device", ""))
+            self._act_dante_rx_ch.setValue(action.get("rx_channel", 1))
+            self._act_dante_tx_dev.setText(action.get("tx_device", ""))
+            self._act_dante_tx_ch.setText(action.get("tx_channel", ""))
 
             self._update_preview()
         finally:
@@ -621,6 +652,14 @@ class ButtonEditorDialog(QDialog):
             data["action"] = {"type": "shortcut", "keys": self._act_keys.text()}
         elif atype_key == "shell":
             data["action"] = {"type": "shell", "command": self._act_cmd.text()}
+        elif atype_key == "dante_route":
+            data["action"] = {
+                "type": "dante_route",
+                "rx_device": self._act_dante_rx_dev.text(),
+                "rx_channel": self._act_dante_rx_ch.value(),
+                "tx_device": self._act_dante_tx_dev.text(),
+                "tx_channel": self._act_dante_tx_ch.text(),
+            }
         elif atype_key == "open_config":
             data["action"] = {"type": "open_config"}
         else:
@@ -726,6 +765,11 @@ class ButtonEditorDialog(QDialog):
                 self._act_keys.setText(action.get("keys", ""))
             elif atype == "shell":
                 self._act_cmd.setText(action.get("command", ""))
+            elif atype == "dante_route":
+                self._act_dante_rx_dev.setText(action.get("rx_device", ""))
+                self._act_dante_rx_ch.setValue(action.get("rx_channel", 1))
+                self._act_dante_tx_dev.setText(action.get("tx_device", ""))
+                self._act_dante_tx_ch.setText(action.get("tx_channel", ""))
 
             # Icon
             icon = btn.get("icon") or {}

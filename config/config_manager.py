@@ -83,6 +83,9 @@ class ConfigManager:
             for knob in scene.get("knobs", []):
                 if "press_action" not in knob:
                     knob["press_action"] = None
+        # Migration: dante-Konfiguration einfügen falls fehlend
+        if "dante" not in self._config:
+            self._config["dante"] = {"host": "", "api_key": ""}
         return self._config
 
     def save(self, config: dict = None):
@@ -300,6 +303,7 @@ class ConfigManager:
             "version": "1.0",
             "brightness": 80,
             "active_scene": 0,
+            "dante": {"host": "", "api_key": ""},
             "scenes": [
                 self._empty_scene(0, "Szene 1"),
                 self._empty_scene(1, "Szene 2"),

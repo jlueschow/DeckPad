@@ -611,6 +611,40 @@ class ConfigWindow(QMainWindow):
         autostart_l.addWidget(autostart_hint)
         layout.addWidget(autostart_grp)
 
+        # Dante DDM Abschnitt
+        dante_grp = QGroupBox("Dante DDM")
+        dante_l = QFormLayout(dante_grp)
+        dante_l.setSpacing(10)
+
+        dante_config = cfg.get().get("dante", {})
+
+        self._dante_host_edit = QLineEdit()
+        self._dante_host_edit.setPlaceholderText("http://172.17.113.10")
+        self._dante_host_edit.setText(dante_config.get("host", ""))
+        self._dante_host_edit.textChanged.connect(self._on_dante_host_changed)
+        dante_l.addRow("DDM Host:", self._dante_host_edit)
+
+        self._dante_key_edit = QLineEdit()
+        self._dante_key_edit.setPlaceholderText("API-Key")
+        self._dante_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self._dante_key_edit.setText(dante_config.get("api_key", ""))
+        self._dante_key_edit.textChanged.connect(self._on_dante_key_changed)
+        dante_l.addRow("API-Key:", self._dante_key_edit)
+
+        dante_test_btn = QPushButton("Verbindung testen")
+        dante_test_btn.setObjectName("GhostButton")
+        dante_test_btn.clicked.connect(self._test_dante_connection)
+        dante_l.addRow("", dante_test_btn)
+
+        dante_hint = QLabel(
+            "API-Key wird im Klartext in config.json gespeichert.\n"
+            "Nur im lokalen Netzwerk (TH-OWL) erreichbar."
+        )
+        dante_hint.setStyleSheet("color: #636366; font-size: 11px;")
+        dante_l.addRow("", dante_hint)
+
+        layout.addWidget(dante_grp)
+
         # Info-Abschnitt
         info_grp = QGroupBox("Info")
         info_l = QFormLayout(info_grp)
@@ -647,6 +681,54 @@ class ConfigWindow(QMainWindow):
         self.brightness_changed.emit(value)
         if self._hid_thread:
             self._hid_thread.set_brightness_now(value)
+
+    def _on_dante_host_changed(self, text: str):
+        cfg.get().setdefault("dante", {})["host"] = text
+        cfg.save()
+
+    def _on_dante_key_changed(self, text: str):
+        cfg.get().setdefault("dante", {})["api_key"] = text
+        cfg.save()
+
+    def _test_dante_connection(self):
+        import urllib.request
+        import urllib.error
+        import json as _json
+        dante_cfg = cfg.get().get("dante", {})
+        host    = dante_cfg.get("host", "").rstrip("/")
+        api_key = dante_cfg.get("api_key", "")
+        if not host:
+            QMessageBox.warning(
+                self, "Dante DDM",
+                "Bitte zuerst einen DDM Host eintragen (z. B. http://172.17.113.10)."
+            )
+            return
+        try:
+            req = urllib.request.Request(
+                f"{host}/graphql",
+                data=b'{"query":"{ domains { name } }"}',
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": api_key,
+                    "User-Agent": "PostmanRuntime/7.45.0",
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = _json.loads(resp.read().decode("utf-8"))
+            domains = [d["name"] for d in data.get("data", {}).get("domains", [])]
+            QMessageBox.information(
+                self, "Dante DDM",
+                f"Verbindung erfolgreich!\nDomains: {', '.join(domains)}"
+            )
+        except urllib.error.URLError as e:
+            QMessageBox.critical(
+                self, "Dante DDM", f"DDM nicht erreichbar:\n{e.reason}"
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Dante DDM", f"Verbindung fehlgeschlagen:\n{e}"
+            )
 
     def update_device_status(self, connected: bool, message: str = ""):
         self.set_connected(connected)
