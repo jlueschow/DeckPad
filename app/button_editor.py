@@ -835,8 +835,16 @@ class KnobEditorDialog(QDialog):
 
         # 3: scroll
         scr_w = QWidget()
-        scr_l = QVBoxLayout(scr_w)
-        scr_l.addWidget(QLabel("Scrollen (noch in Entwicklung)."))
+        scr_l = QFormLayout(scr_w)
+        self._scroll_axis = QComboBox()
+        self._scroll_axis.addItem("Vertikal",    "vertical")
+        self._scroll_axis.addItem("Horizontal",  "horizontal")
+        scr_l.addRow("Richtung:", self._scroll_axis)
+        self._scroll_speed = QSpinBox()
+        self._scroll_speed.setRange(1, 10)
+        self._scroll_speed.setValue(3)
+        self._scroll_speed.setSuffix("  (1 = langsam, 10 = schnell)")
+        scr_l.addRow("Geschwindigkeit:", self._scroll_speed)
         self._action_stack.addWidget(scr_w)
 
         # 4: none
@@ -1049,6 +1057,10 @@ class KnobEditorDialog(QDialog):
         self._action_combo.setCurrentIndex(_type_index(KNOB_ACTION_TYPES, atype))
         self._key_cw.setText(action.get("key_cw", ""))
         self._key_ccw.setText(action.get("key_ccw", ""))
+        # Scroll-Felder
+        axis = action.get("axis", "vertical")
+        self._scroll_axis.setCurrentIndex(0 if axis == "vertical" else 1)
+        self._scroll_speed.setValue(int(action.get("speed", 3)))
 
         # Druck-Aktion laden
         press_action = self._data.get("press_action") or {}
@@ -1080,7 +1092,11 @@ class KnobEditorDialog(QDialog):
                 "key_ccw": self._key_ccw.text(),
             }
         elif atype_key == "scroll":
-            action = {"type": "scroll"}
+            action = {
+                "type":  "scroll",
+                "axis":  self._scroll_axis.currentData(),
+                "speed": self._scroll_speed.value(),
+            }
         else:
             action = None
 

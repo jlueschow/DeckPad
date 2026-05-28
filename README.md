@@ -8,7 +8,7 @@ Configure buttons, knobs and navigation keys with shortcuts, app launchers, URLs
 ## Features
 
 - **6 configurable buttons** per scene — assign shortcuts, launch apps, open URLs or run shell commands
-- **3 rotary knobs** — turn actions (volume, brightness, custom shortcuts) + press actions
+- **3 rotary knobs** — turn actions (volume, brightness, scroll, custom shortcuts) + press actions
 - **Multiple scenes** — switch between layouts with the hardware navigation keys (Prev / Home / Next)
 - **Button & page library** — built-in categories (media, system, productivity) + custom buttons you save yourself
 - **Menu-bar only** — no Dock icon, runs silently in the background
@@ -64,7 +64,16 @@ pyinstaller DeckPad.spec
 # -> dist/DeckPad.app  (~120 MB, fully self-contained)
 ```
 
-Copy `dist/DeckPad.app` to `/Applications` and launch it like any other app.
+Install to `/Applications` — always remove the old version first:
+
+```bash
+rm -rf /Applications/DeckPad.app
+cp -R dist/DeckPad.app /Applications/
+```
+
+> **Note:** Using `cp -R` without removing the old app first merges the directories instead of replacing them — the old binary stays in place.
+
+After installing, grant **Accessibility** access (see [Permissions](#permissions) below).
 
 ---
 
@@ -134,11 +143,20 @@ User data (config, custom library) is stored in:
 
 ### Permissions
 
-DeckPad needs **Accessibility** access to send keyboard shortcuts:
+DeckPad needs **Accessibility** access to send keyboard shortcuts, scroll events and other synthetic input:
 
-> System Settings → Privacy & Security → Accessibility → add DeckPad
+> **System Settings → Privacy & Security → Accessibility → add DeckPad**
 
-When running from source you may also need to grant the Terminal (or your Python binary) Accessibility access.
+When running from source (`python3 app_main.py`) the Terminal or Python binary needs this permission instead.
+
+DeckPad will show a warning dialog on first launch if Accessibility access is missing, with a button to open System Settings directly.
+
+> **After every reinstall:** macOS ties the Accessibility grant to the app's code signature. Replacing the `.app` bundle (even to the same path) creates a new identity — the old grant is silently revoked.  
+> **After each reinstall you must:**  
+> 1. Open System Settings → Privacy & Security → Accessibility  
+> 2. Remove DeckPad from the list (`−`)  
+> 3. Add it again (`+` → `/Applications/DeckPad.app`)  
+> 4. Restart DeckPad
 
 ### HID access
 

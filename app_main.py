@@ -46,7 +46,13 @@ def main():
     # QApplication initialisiert wird. Zu diesem Zeitpunkt gibt es noch kein
     # aktives Fenster → kein Fokus-Raub möglich (Bug 8).
     import subprocess
-    _base     = os.path.dirname(os.path.abspath(__file__))
+    # Im PyInstaller-Bundle ist __file__ undefiniert oder zeigt auf sys.executable —
+    # daher sys._MEIPASS (Bundle-Ressourcen) verwenden. Im Entwicklungsmodus
+    # (python3 app_main.py) gibt es kein sys.frozen → normaler __file__-Pfad.
+    if getattr(sys, "frozen", False):
+        _base = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    else:
+        _base = os.path.dirname(os.path.abspath(__file__))
     _icons    = os.path.join(_base, "assets", "icons")
     _script   = os.path.join(_base, "create_library_icons.py")
     _n_icons  = sum(1 for f in os.listdir(_icons) if f.endswith(".png")) if os.path.isdir(_icons) else 0
@@ -102,6 +108,49 @@ def main():
     # HID-Thread und ConfigWindow starten sich intern verzögert (400/800 ms)
     # damit der Qt-Event-Loop zuerst vollständig hochgefahren ist.
     menu_bar = MenuBarApp(app)   # noqa: F841  (Referenz muss gehalten werden)
+
+    # ── Bedienungshilfen-Berechtigung prüfen (macOS) ──────────────────────────
+    # Ohne Accessibility-Permission funktionieren CGEventPost-basierte Aktionen
+    # (Tastaturkürzel, Scroll) nicht im Bundle. Im Terminal-Start (python3 ...)
+    # greift die Permission des Terminal-Prozesses — deshalb funktioniert es
+    # dort ohne explizite Freigabe.
+    if sys.platform == "darwin":
+        def _check_accessibility():
+            try:
+                from Quartz import AXIsProcessTrusted
+                if not AXIsProcessTrusted():
+                    _warn_no_accessibility()
+            except Exception:
+                pass
+
+        def _warn_no_accessibility():
+            from PySide6.QtWidgets import QMessageBox, QPushButton
+            msg = QMessageBox()
+            msg.setWindowTitle("Bedienungshilfen-Berechtigung fehlt")
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setText(
+                "DeckPad braucht Zugriff auf Bedienungshilfen,\n"
+                "damit Tastaturkürzel und Scroll-Aktionen funktionieren."
+            )
+            msg.setInformativeText(
+                "Systemeinstellungen → Datenschutz & Sicherheit →\n"
+                "Bedienungshilfen → DeckPad hinzufügen.\n\n"
+                "Danach DeckPad neu starten."
+            )
+            btn_open = msg.addButton(
+                "Systemeinstellungen öffnen", QMessageBox.ButtonRole.ActionRole
+            )
+            msg.addButton("Schließen", QMessageBox.ButtonRole.RejectRole)
+            msg.exec()
+            if msg.clickedButton() == btn_open:
+                import subprocess
+                subprocess.Popen([
+                    "open",
+                    "x-apple.systempreferences:"
+                    "com.apple.preference.security?Privacy_Accessibility",
+                ])
+
+        QTimer.singleShot(1500, _check_accessibility)
 
     sys.exit(app.exec())
 

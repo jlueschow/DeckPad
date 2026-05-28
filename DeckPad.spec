@@ -131,6 +131,7 @@ app = BUNDLE(
         "NSHighResolutionCapable":    True,
         "LSUIElement":                True,   # Kein Dock-Icon (Menu-Bar-Only)
         "LSMinimumSystemVersion":     "13.0",
-        "NSAppleEventsUsageDescription": "DeckPad benötigt Apple Events für Systemaktionen.",
+        "NSAppleEventsUsageDescription":   "DeckPad benötigt Apple Events für Systemaktionen.",
+        "NSAccessibilityUsageDescription": "DeckPad sendet Tastaturkürzel und Scroll-Aktionen an andere Apps.",
     },
 )

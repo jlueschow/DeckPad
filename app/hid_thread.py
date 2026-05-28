@@ -332,4 +332,8 @@ def _run_knob_action(action: dict, direction: int):
         if key:
             actions.send_shortcut(key)
     elif atype == "scroll":
-        pass  # TODO: scroll implementation
+        actions.scroll(
+            direction,
+            axis=action.get("axis", "vertical"),
+            speed=action.get("speed", 3),
+        )

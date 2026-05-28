@@ -120,6 +120,77 @@ class MediaBrightnessKnob:
         brightness_up() if direction > 0 else brightness_down()
 
 
+# ── Scroll ─────────────────────────────────────────────────────────────────────
+
+def _scroll_macos(direction: int, axis: str, speed: int):
+    """
+    Sendet ein Scroll-Event via CGEventCreateScrollWheelEvent.
+
+    Konvention (entspricht physischem Mausrad):
+      CW  (direction > 0) → nach unten / rechts scrollen → negativer wheel-Wert
+      CCW (direction < 0) → nach oben  / links  scrollen → positiver wheel-Wert
+
+    Alle drei Delta-Felder werden gesetzt (rohe Feldnummern aus CGEventTypes.h):
+      11/12 — Integer-Delta    (kCGScrollWheelEventDeltaAxis1/2)
+      93/94 — Fixed-Point-     (kCGScrollWheelEventFixedPtDeltaAxis1/2, 16.16-Format)
+      96/97 — Pixel-Delta      (kCGScrollWheelEventPointDeltaAxis1/2)
+    Moderne Browser (Chrome, Safari) brauchen mind. Fixed-Point + Pixel-Delta.
+    """
+    amount = -direction * speed   # CW → runter → negativ in CG-Koordinaten
+
+    if axis == "horizontal":
+        int_field, fp_field, pt_field = 12, 94, 97   # Axis-2
+    else:
+        int_field, fp_field, pt_field = 11, 93, 96   # Axis-1
+
+    try:
+        event = Quartz.CGEventCreateScrollWheelEvent(
+            None, Quartz.kCGScrollEventUnitLine, 1, 0
+        )
+        if event is None:
+            log("scroll ▶ macOS: Event-Erstellung fehlgeschlagen (None)")
+            return
+        # Integer-Delta (Zeilenanzahl, ältere Apps)
+        Quartz.CGEventSetIntegerValueField(event, int_field, amount)
+        # Fixed-Point-Delta (16.16-Format: amount * 65536)
+        Quartz.CGEventSetIntegerValueField(event, fp_field, amount << 16)
+        # Pixel-Delta (ca. 10 px/Zeile — Chrome/Safari momentum scrolling)
+        Quartz.CGEventSetIntegerValueField(event, pt_field, amount * 10)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
+    except Exception as exc:
+        log(f"scroll ▶ macOS Fehler: {exc}")
+        print(f"[scroll_macos] Fehler: {exc}")
+
+
+def _scroll_windows(direction: int, axis: str, speed: int):
+    try:
+        import pyautogui
+        # pyautogui.scroll: positiv = hoch, negativ = runter → gleiche Konvention
+        amount = -direction * speed * 3   # 3 pyautogui-Clicks pro Einheit
+        if axis == "horizontal":
+            pyautogui.hscroll(amount)
+        else:
+            pyautogui.scroll(amount)
+    except Exception as e:
+        print(f"[scroll_windows] Fehler: {e}")
+
+
+def scroll(direction: int, axis: str = "vertical", speed: int = 3):
+    """
+    Sendet ein Scroll-Ereignis an das aktuell fokussierte Fenster.
+
+    direction > 0 (CW)  → nach unten / rechts scrollen
+    direction < 0 (CCW) → nach oben  / links  scrollen
+    axis  : "vertical" (Standard) oder "horizontal"
+    speed : Scroll-Einheiten pro Knob-Schritt (1–10, Standard 3)
+    """
+    log(f"scroll ▶ dir={direction:+d}  axis={axis}  speed={speed}")
+    if sys.platform == "darwin":
+        _scroll_macos(direction, axis, speed)
+    else:
+        _scroll_windows(direction, axis, speed)
+
+
 # ── Keyboard shortcuts ─────────────────────────────────────────────────────────
 
 # macOS Virtual Keycodes (Carbon)
