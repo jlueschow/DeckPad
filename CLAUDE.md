@@ -66,6 +66,24 @@ niemals HIDAPI im Background-Thread aufrufen.
 Fenster via `winId()` → NSView → `.window()` auf den aktuellen macOS-Space
 bringen (nicht per Titel-Lookup — race-prone).
 
+## System-App-Icon-Extraktion (macOS)
+
+Apps wie Calendar, Notes, Reminders haben kein `.icns` im Bundle — ihr Icon
+steckt in `Assets.car`. `_find_icns()` gibt None zurück → alter Code warf
+`FileNotFoundError`.
+
+**Lösung:** `_extract_via_nsworkspace(app_path)` in `icons.py`:
+- `NSWorkspace.sharedWorkspace().iconForFile_()` → NSImage
+- `NSImage.TIFFRepresentation()` → `NSBitmapImageRep` → PNG (kein `lockFocus`)
+- Gecacht in `~/Library/Application Support/DeckPad/icons/<AppName>.png`
+- Cache-Treffer: < 1 ms
+
+`load_app_icon()` fällt transparent durch:
+`_find_icns()` → `_extract_via_nsworkspace()` → `raise FileNotFoundError`
+
+Kein Dateiformat-Change. Kein Change an scene_widget.py oder button_editor.py
+(außer einem Hinweis-Label im App-Icon-Panel). Commit: `ad392ed`.
+
 ## Aktueller Stand (Mai 2026)
 
 ### Fertig
@@ -78,10 +96,16 @@ bringen (nicht per Titel-Lookup — race-prone).
 - Media-Key-Fix: f7–f12 → NX_KEYTYPE via _post_media_key_macos()
 - PySide6-Migration (von PyQt6)
 - Windows-Kompatibilität (actions.py plattform-aware)
+- Scroll-Aktion für Knob (alle drei CGEvent-Delta-Felder, Browser-kompatibel)
+- Accessibility-Check beim Start (AXIsProcessTrusted + Dialog mit Link)
+- System-App-Icon-Extraktion (NSWorkspace, für Calendar/Notes/Reminders)
 
-### Ausstehend (Phase 3)
+### Ausstehend
 - App-Bundle bauen (PyInstaller) — nächster geplanter Schritt
-- Scroll-Aktion für Knob (TODO in hid_thread.py)
+- Drag & Drop in Button-Slots
+- README-Screenshots für GitHub
+- Gatekeeper / Notarisierung
+- Bug: Downloads-Ordner-Permission (GitHub Issue #1, low priority)
 
 ## Daten
 
