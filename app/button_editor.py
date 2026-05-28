@@ -520,12 +520,12 @@ class ButtonEditorDialog(QDialog):
         scroll.setWidget(content_w)
 
         # ── Splitter: Editor links | Button-Bibliothek rechts ─────────────────
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setChildrenCollapsible(False)
-        splitter.addWidget(scroll)
-        splitter.addWidget(self._build_library_panel())
-        splitter.setSizes([520, 300])
-        root.addWidget(splitter, 1)
+        self._splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._splitter.setChildrenCollapsible(False)
+        self._splitter.addWidget(scroll)
+        self._splitter.addWidget(self._build_library_panel())
+        self._splitter.setSizes([520, 300])
+        root.addWidget(self._splitter, 1)
 
         # ── Feste Button-Leiste (immer sichtbar) ──────────────────────────────
         self._btn_area = QWidget()
@@ -641,14 +641,43 @@ class ButtonEditorDialog(QDialog):
         self._update_preview()
 
     def _on_action_type_changed(self, idx):
+        prev_akey = ACTION_TYPES[self._action_stack.currentIndex()][0] \
+            if 0 <= self._action_stack.currentIndex() < len(ACTION_TYPES) else ""
         self._action_stack.setCurrentIndex(idx)
         akey = ACTION_TYPES[idx][0]
+
         # Bei "App öffnen": automatisch App-Browser öffnen — aber nicht beim Laden
         if not self._loading and akey == "open_app":
             self._browse_for_open_app()
         # Bei "Dante Routing": Geräteliste laden (falls noch nicht geschehen)
         elif akey == "dante_route" and not self._dante_devices:
             self._dante_load_devices()
+
+        # Dialog-Breite anpassen
+        if akey == "dante_route" and prev_akey != "dante_route":
+            self._set_wide_layout(True)
+        elif prev_akey == "dante_route" and akey != "dante_route":
+            self._set_wide_layout(False)
+
+    def _set_wide_layout(self, wide: bool):
+        """
+        Wechselt zwischen Normal- (840 px) und Dante-Breite (1100 px).
+        Passt auch die Splitter-Aufteilung an, damit der Editor-Bereich
+        genug Platz für die 4-Spalten-Tabelle hat.
+        """
+        screen = self.screen()
+        screen_w = screen.availableGeometry().width() if screen else 1440
+
+        if wide:
+            target_w = min(1100, int(screen_w * 0.88))
+            self.setMinimumWidth(target_w)
+            self.resize(target_w, self.height())
+            lib_w = 220
+            self._splitter.setSizes([target_w - lib_w - 6, lib_w])
+        else:
+            self.setMinimumWidth(840)
+            self.resize(840, self.height())
+            self._splitter.setSizes([520, 300])
 
     # ── Dante DDM — Laden ────────────────────────────────────────────────────
 
