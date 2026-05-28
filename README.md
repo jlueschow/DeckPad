@@ -5,6 +5,22 @@ Configure buttons, knobs and navigation keys with shortcuts, app launchers, URLs
 
 ---
 
+## Screenshots
+
+**Konfigurationsfenster** — Szenen, Buttons und Knobs auf einen Blick:
+
+![Config Window](docs/screenshots/01_config_window.png)
+
+**Button-Editor** — Aktion, Icon und Label konfigurieren (mit Button-Bibliothek rechts):
+
+![Button Editor](docs/screenshots/02_button_editor.png)
+
+**Knob-Editor** — Dreh- und Drück-Aktion unabhängig konfigurieren:
+
+![Knob Editor](docs/screenshots/03_knob_editor.png)
+
+---
+
 ## Features
 
 - **6 configurable buttons** per scene — assign shortcuts, launch apps, open URLs or run shell commands
