@@ -22,6 +22,24 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 def main():
+    # ── Einzelinstanz-Schutz ──────────────────────────────────────────────────
+    # Verhindert, dass launchctl-bootstrap (beim Aktivieren des Autostarts)
+    # oder ein Doppelklick auf das App-Icon eine zweite Instanz startet.
+    # fcntl-Lock auf User-Data-Verzeichnis: zweite Instanz bemerkt die erste
+    # und beendet sich lautlos mit Exit-Code 0 (kein Crash-Dialog).
+    # Hinweis: Lock-FD muss bis App-Ende im Scope bleiben → lokale Variable
+    # lebt so lange wie main() läuft (blockiert in app.exec()).
+    if sys.platform == "darwin":
+        import fcntl
+        _lock_dir  = os.path.expanduser("~/Library/Application Support/DeckPad")
+        os.makedirs(_lock_dir, exist_ok=True)
+        _lock_path = os.path.join(_lock_dir, ".lock")
+        try:
+            _lock_fd = open(_lock_path, "w")          # noqa: SIM115
+            fcntl.lockf(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, OSError):
+            sys.exit(0)   # Bereits eine Instanz aktiv → lautlos beenden
+
     # ── Library-Icons ggf. generieren — VOR QApplication ─────────────────────
     # NSImage.lockFocus() (in create_library_icons.py) ist inkompatibel mit dem
     # Cocoa-Stack den PySide6 aufbaut. Lösung: Generation als Subprocess bevor
