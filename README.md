@@ -13,7 +13,7 @@ Configure buttons, knobs and navigation keys with shortcuts, app launchers, URLs
 
 **Button-Editor** — Aktion, Icon und Label konfigurieren (mit Button-Bibliothek rechts):
 
-![Button Editor](docs/screenshots/02_button_editor.png)
+![Button Editor](docs/screenshots/02_button_editor_v2.png)
 
 **Knob-Editor** — Dreh- und Drück-Aktion unabhängig konfigurieren:
 

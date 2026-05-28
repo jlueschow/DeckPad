@@ -82,7 +82,7 @@ def run():
         dlg.raise_()
 
         def shot_btn():
-            grab_widget(dlg, "02_button_editor.png")
+            grab_widget(dlg, "02_button_editor_v2.png")
             shots_taken.append("button_editor")
             dlg.reject()
             QTimer.singleShot(200, open_knob_editor)
