@@ -22,6 +22,22 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 def main():
+    # ── Library-Icons ggf. generieren — VOR QApplication ─────────────────────
+    # NSImage.lockFocus() (in create_library_icons.py) ist inkompatibel mit dem
+    # Cocoa-Stack den PySide6 aufbaut. Lösung: Generation als Subprocess bevor
+    # QApplication initialisiert wird. Zu diesem Zeitpunkt gibt es noch kein
+    # aktives Fenster → kein Fokus-Raub möglich (Bug 8).
+    import subprocess
+    _base     = os.path.dirname(os.path.abspath(__file__))
+    _icons    = os.path.join(_base, "assets", "icons")
+    _script   = os.path.join(_base, "create_library_icons.py")
+    _n_icons  = sum(1 for f in os.listdir(_icons) if f.endswith(".png")) if os.path.isdir(_icons) else 0
+    if _n_icons < 10 and os.path.exists(_script):
+        try:
+            subprocess.run([sys.executable, _script], capture_output=True, timeout=60)
+        except Exception:
+            pass  # Icons fehlen → Bibliothek zeigt Fallback-Text
+
     # ── QApplication ZUERST erzeugen ─────────────────────────────────────────
     # ALLE weiteren Imports (Quartz, AppKit, HIDThread, ConfigWindow) kommen
     # erst danach — sonst initialisiert AppKit den Cocoa-Stack vor PySide6
@@ -61,17 +77,6 @@ def main():
     # (Quartz/AppKit via actions.py darf nicht vor QApplication initialisiert werden)
     from config.config_manager import _init_user_data
     _init_user_data()   # Nutzerdaten-Verzeichnis beim ersten Start anlegen (Bundle)
-
-    # ── Library-Icons generieren falls nicht vorhanden ────────────────────────
-    # SF-Symbol-Icons werden lokal aus macOS generiert (nicht in Git eingecheckt,
-    # da SF Symbols urheberrechtlich geschützt sind). create_library_icons nutzt
-    # AppKit → Import erst nach QApplication erlaubt.
-    try:
-        from create_library_icons import icons_exist, generate_icons
-        if not icons_exist():
-            generate_icons(silent=True)
-    except Exception:
-        pass  # Icons fehlen → Bibliothek zeigt Fallback-Text, App läuft trotzdem
 
     from app.menu_bar import MenuBarApp
 

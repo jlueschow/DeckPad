@@ -90,13 +90,22 @@ ICONS = [
 
 def _render_sf_symbol(symbol_name: str, size: int) -> "Image.Image | None":
     """
-    Rendert ein SF Symbol via AppKit auf transparentem Hintergrund.
+    Rendert ein SF Symbol via CGBitmapContext direkt in einen Rohpixelpuffer.
+
+    Verwendet absichtlich KEIN ImageIO (kein TIFF, kein PNG-Codec) —
+    auf macOS 26.x führt TIFFRepresentation() zu einem SIGBUS in
+    SetupTIFFErrorHandler() (vergifteter Funktionszeiger in ImageIO).
+    CGBitmapContextCreate + PIL.Image.frombuffer() umgeht ImageIO vollständig.
+
     Gibt ein PIL RGBA Image zurück, oder None bei Fehler.
     """
     try:
-        from AppKit import (
-            NSImage, NSBitmapImageRep, NSMakeRect,
-            NSPNGFileType,
+        import ctypes
+        from AppKit import NSImage, NSGraphicsContext, NSMakeRect
+        from Quartz import (
+            CGBitmapContextCreate,
+            CGColorSpaceCreateDeviceRGB,
+            kCGImageAlphaPremultipliedLast,
         )
 
         sym = NSImage.imageWithSystemSymbolName_accessibilityDescription_(
@@ -105,21 +114,39 @@ def _render_sf_symbol(symbol_name: str, size: int) -> "Image.Image | None":
         if sym is None:
             return None
 
-        # Transparenten Canvas aufbauen und Symbol reinzeichnen
-        canvas = NSImage.alloc().initWithSize_((size, size))
-        canvas.lockFocus()
+        # Rohpuffer anlegen: width × height × 4 Byte (RGBA)
+        bytes_per_row = size * 4
+        buf = (ctypes.c_uint8 * (bytes_per_row * size))()
+
+        cs     = CGColorSpaceCreateDeviceRGB()
+        cg_ctx = CGBitmapContextCreate(
+            buf, size, size, 8, bytes_per_row, cs,
+            kCGImageAlphaPremultipliedLast,
+        )
+        if cg_ctx is None:
+            return None
+
+        # NSGraphicsContext auf den CG-Kontext zeigen lassen.
+        # flipped=True: y=0 ist oben → Zeilenreihenfolge im Puffer
+        # entspricht direkt PIL (kein nachträgliches Spiegeln nötig).
+        ns_ctx = NSGraphicsContext.graphicsContextWithCGContext_flipped_(
+            cg_ctx, True
+        )
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.setCurrentContext_(ns_ctx)
         sym.drawInRect_fromRect_operation_fraction_(
             NSMakeRect(0, 0, size, size),
             NSMakeRect(0, 0, 0, 0),   # 0,0,0,0 = gesamtes Quellbild
             17,                        # NSCompositingOperationSourceOver
             1.0,
         )
-        canvas.unlockFocus()
+        NSGraphicsContext.restoreGraphicsState()
 
-        tiff = canvas.TIFFRepresentation()
-        rep  = NSBitmapImageRep.imageRepWithData_(tiff)
-        png  = bytes(rep.representationUsingType_properties_(NSPNGFileType, None))
-        return Image.open(io.BytesIO(png)).convert("RGBA")
+        # Rohdaten direkt → PIL, kein ImageIO beteiligt
+        img = Image.frombuffer(
+            "RGBA", (size, size), bytes(buf), "raw", "RGBA", 0, 1
+        )
+        return img.convert("RGBA")
 
     except Exception as exc:
         print(f"    AppKit Fehler für '{symbol_name}': {exc}", file=sys.stderr)
