@@ -584,15 +584,10 @@ class ButtonEditorDialog(QDialog):
 
             action = self._data.get("action") or {}
             atype = action.get("type", "none") if action else "none"
-            self._action_combo.setCurrentIndex(_type_index(ACTION_TYPES, atype))
 
-            self._act_app_name.setText(action.get("name", ""))
-            self._act_app_path.setText(action.get("path", "") or "")
-            self._act_url.setText(action.get("url", ""))
-            self._act_keys.setText(action.get("keys", ""))
-            self._act_cmd.setText(action.get("command", ""))
-
-            # dante_route: gespeicherte Werte merken → nach Gerätelade einsetzen
+            # dante_route: pending VOR setCurrentIndex setzen — das Signal
+            # _on_action_type_changed startet den Loader sofort, er muss die
+            # Werte schon vorfinden, bevor er _dante_restore_pending() aufruft.
             if atype == "dante_route":
                 self._dante_pending = {
                     "rx_device": action.get("rx_device", ""),
@@ -600,7 +595,15 @@ class ButtonEditorDialog(QDialog):
                     "tx_device":  action.get("tx_device", ""),
                     "tx_channel": action.get("tx_channel", ""),
                 }
-                self._dante_load_devices()
+
+            self._action_combo.setCurrentIndex(_type_index(ACTION_TYPES, atype))
+            # ↑ feuert _on_action_type_changed → startet Loader falls dante_route
+
+            self._act_app_name.setText(action.get("name", ""))
+            self._act_app_path.setText(action.get("path", "") or "")
+            self._act_url.setText(action.get("url", ""))
+            self._act_keys.setText(action.get("keys", ""))
+            self._act_cmd.setText(action.get("command", ""))
 
             self._update_preview()
         finally:
