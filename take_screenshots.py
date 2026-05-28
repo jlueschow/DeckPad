@@ -70,17 +70,13 @@ def run():
         QTimer.singleShot(200, open_button_editor)
 
     def open_button_editor():
-        config = cfg.get()
-        scenes = config.get("scenes", [])
-        if not scenes:
-            QTimer.singleShot(100, open_knob_editor)
-            return
-        # Ersten belegten Button wählen (oder ersten leeren)
-        btn = next(
-            (b for b in scenes[0].get("buttons", []) if b.get("label") or b.get("action")),
-            scenes[0].get("buttons", [{"index": 1, "label": "Test", "icon": None,
-                                       "action": {"type": "shortcut", "keys": "cmd+c"}}])[0]
-        )
+        # Neutraler Demo-Button: Tastenkürzel, Emoji-Icon — kein Drittanbieter-Logo
+        btn = {
+            "index": 1,
+            "label": "Kopieren",
+            "icon": {"type": "emoji", "emoji": "⎘", "bg": [30, 30, 60]},
+            "action": {"type": "shortcut", "keys": "cmd+c"},
+        }
         dlg = ButtonEditorDialog(btn, config_win)
         dlg.show()
         dlg.raise_()
