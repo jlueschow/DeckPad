@@ -1,7 +1,10 @@
 """
 Icon generator for AKP03E LCD buttons (76×76 px JPEG).
 
-load_app_icon(path) — lädt echtes App-Icon aus .app-Bundle oder Bilddatei (kein AppKit)
+load_app_icon(path) — lädt App-Icon aus .app-Bundle oder Bilddatei.
+                      Für Apps mit .icns: Pillow / sips (kein AppKit).
+                      Für Apps ohne .icns (Calendar, Notes, Reminders → Assets.car):
+                      Fallback via NSWorkspace (macOS Main-Thread, gecacht).
 make_icon(label)    — Text/Emoji-Fallback
 """
 
@@ -53,6 +56,65 @@ def _find_icns(app_path: str) -> str | None:
 
 
 
+def _extract_via_nsworkspace(app_path: str) -> str | None:
+    """
+    Extrahiert das App-Icon über NSWorkspace.iconForFile_ und speichert es als PNG.
+    Gedacht für Apps ohne .icns-Datei (Calendar, Notes, Reminders — nutzen Assets.car).
+
+    Nur auf dem Main-Thread aufrufen (AppKit-Voraussetzung).
+    Ergebnis wird gecacht in ~/Library/Application Support/DeckPad/icons/<App>.png.
+    Gibt den Pfad zur PNG zurück, oder None bei Fehler.
+    """
+    import sys
+    if sys.platform != "darwin":
+        return None
+    if not os.path.exists(app_path):
+        return None
+
+    # Sicherer Dateiname: nur alphanumerisch + Leerzeichen, Bindestriche, Unterstriche
+    app_name  = os.path.basename(app_path).replace(".app", "")
+    safe_name = "".join(c for c in app_name if c.isalnum() or c in " -_.")
+
+    cache_dir  = os.path.expanduser("~/Library/Application Support/DeckPad/icons")
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_path = os.path.join(cache_dir, f"{safe_name}.png")
+
+    # Cache-Treffer → sofort zurückgeben
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+        return cache_path
+
+    try:
+        from AppKit import NSWorkspace, NSBitmapImageRep   # noqa: F401
+        ws   = NSWorkspace.sharedWorkspace()
+        icon = ws.iconForFile_(app_path)
+        if icon is None:
+            return None
+
+        # 512 × 512 anfordern — beste verfügbare Repräsentation
+        icon.setSize_((512, 512))
+
+        # NSImage → TIFF → NSBitmapImageRep → PNG
+        # TIFFRepresentation() benötigt kein lockFocus — nach QApplication-Init sicher
+        tiff_data = icon.TIFFRepresentation()
+        if not tiff_data:
+            return None
+        bitmap = NSBitmapImageRep.imageRepWithData_(tiff_data)
+        if bitmap is None:
+            return None
+        # NSBitmapImageFileTypePNG = 4
+        png_data = bitmap.representationUsingType_properties_(4, None)
+        if not png_data:
+            return None
+
+        with open(cache_path, "wb") as f:
+            f.write(bytes(png_data))
+
+        return cache_path
+
+    except Exception:
+        return None
+
+
 def _load_via_sips(icns_path: str) -> "Image.Image | None":
     """
     Konvertiert .icns → PNG via sips (macOS-builtin).
@@ -95,7 +157,11 @@ def load_app_icon(path: str, size: int = ICON_SIZE, bg: tuple = _BG_DARK,
     if path.endswith(".app"):
         icns_path = _find_icns(path)
         if not icns_path:
-            raise FileNotFoundError(f"Kein .icns-Icon in App-Bundle gefunden: {path}")
+            # Fallback für Apps ohne .icns (Calendar, Notes, Reminders → Assets.car):
+            # Icon über NSWorkspace extrahieren und lokal cachen.
+            icns_path = _extract_via_nsworkspace(path)
+        if not icns_path:
+            raise FileNotFoundError(f"Kein Icon in App-Bundle gefunden: {path}")
     else:
         icns_path = path
 

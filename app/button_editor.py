@@ -361,6 +361,13 @@ class ButtonEditorDialog(QDialog):
         app_icon_row.addWidget(self._app_path_edit)
         app_icon_row.addWidget(icon_browse_btn)
         al.addRow("App-Pfad:", app_icon_row)
+        app_icon_hint = QLabel(
+            "Funktioniert auch für System-Apps (Kalender, Notizen, …) — "
+            "Icon wird beim ersten Auswählen automatisch extrahiert."
+        )
+        app_icon_hint.setWordWrap(True)
+        app_icon_hint.setStyleSheet("color: #8E8E93; font-size: 11px;")
+        al.addRow("", app_icon_hint)
         self._icon_stack.addWidget(app_icon_page)
 
         # Page 3: file
