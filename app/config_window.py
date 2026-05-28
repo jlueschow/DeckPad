@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QLabel, QPushButton, QSlider, QFrame, QScrollArea, QSizePolicy,
     QStackedWidget, QInputDialog, QMessageBox, QSpacerItem, QGroupBox,
-    QFormLayout, QTabBar, QCheckBox
+    QFormLayout, QTabBar, QCheckBox, QLineEdit
 )
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QFont, QIcon, QPixmap, QColor
