@@ -248,6 +248,12 @@ class ConfigWindow(QMainWindow):
             sw.rename_requested.connect(
                 lambda si=i: self._rename_scene(si)
             )
+            sw.buttons_swapped.connect(
+                lambda src, tgt, si=i: self._swap_buttons(si, src, tgt)
+            )
+            sw.knobs_swapped.connect(
+                lambda src, tgt, si=i: self._swap_knobs(si, src, tgt)
+            )
             self._scene_stack.addWidget(sw)
             self._scene_widgets.append(sw)
 
@@ -350,6 +356,55 @@ class ConfigWindow(QMainWindow):
             self._scene_widgets[scene_index].refresh_scene(
                 config["scenes"][scene_index]
             )
+
+    # ── Drag & Drop: Tauschen ──────────────────────────────────────────────────
+
+    def _swap_buttons(self, scene_index: int, idx_a: int, idx_b: int):
+        """
+        Tauscht Label, Icon und Aktion zweier LCD-Buttons (Index bleibt erhalten).
+        Wird nach Drag & Drop in SceneWidget aufgerufen.
+        """
+        import copy
+        config  = cfg.get()
+        buttons = config["scenes"][scene_index]["buttons"]
+        ba = next((b for b in buttons if b["index"] == idx_a), None)
+        bb = next((b for b in buttons if b["index"] == idx_b), None)
+        if ba is None or bb is None:
+            return
+
+        # Inhalte tauschen — Index bleibt
+        for key in ("label", "icon", "action"):
+            va = copy.deepcopy(ba.get(key))
+            vb = copy.deepcopy(bb.get(key))
+            ba[key] = vb
+            bb[key] = va
+
+        cfg.save()
+        self._scene_widgets[scene_index].refresh_scene(config["scenes"][scene_index])
+        if scene_index == self._scene_tabs.currentIndex():
+            self.scene_changed.emit(scene_index)
+
+    def _swap_knobs(self, scene_index: int, idx_a: int, idx_b: int):
+        """
+        Tauscht Label und Aktion zweier Knobs (Index bleibt erhalten).
+        Wird nach Drag & Drop in SceneWidget aufgerufen.
+        """
+        import copy
+        config = cfg.get()
+        knobs  = config["scenes"][scene_index]["knobs"]
+        ka = next((k for k in knobs if k["index"] == idx_a), None)
+        kb = next((k for k in knobs if k["index"] == idx_b), None)
+        if ka is None or kb is None:
+            return
+
+        for key in ("label", "action"):
+            va = copy.deepcopy(ka.get(key))
+            vb = copy.deepcopy(kb.get(key))
+            ka[key] = vb
+            kb[key] = va
+
+        cfg.save()
+        self._scene_widgets[scene_index].refresh_scene(config["scenes"][scene_index])
 
     # ── Bibliothek-Callbacks ───────────────────────────────────────────────────
 

@@ -11,9 +11,10 @@ import sys, os, io
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-                              QLabel, QFrame, QSizePolicy, QPushButton)
-from PySide6.QtCore import Signal, Qt, QSize, QEvent
-from PySide6.QtGui import QPixmap, QFont, QTransform, QPainter, QColor
+                              QLabel, QFrame, QSizePolicy, QPushButton,
+                              QApplication)
+from PySide6.QtCore import Signal, Qt, QSize, QEvent, QMimeData
+from PySide6.QtGui import QPixmap, QFont, QTransform, QPainter, QColor, QDrag
 
 from icons import make_icon, load_app_icon
 
@@ -66,15 +67,24 @@ def _icon_to_pixmap(btn: dict, size: int = ICON_DISP) -> QPixmap:
 # ── ButtonSlot ─────────────────────────────────────────────────────────────────
 
 class ButtonSlot(QWidget):
-    """Ein klickbarer Button-Slot mit Icon-Vorschau und Label."""
-    clicked_edit = Signal(dict)
+    """
+    Klickbarer Button-Slot mit Icon-Vorschau und Label.
+    Unterstützt Drag & Drop zum Tauschen von LCD-Buttons untereinander.
+    """
+    clicked_edit   = Signal(dict)
+    swap_requested = Signal(int, int)   # (source_index, target_index)
+
+    _DRAG_MIME = "application/x-deckpad-button"
 
     def __init__(self, btn_data: dict, parent=None):
         super().__init__(parent)
-        self._data = btn_data
+        self._data            = btn_data
+        self._drag_start_pos  = None
+        self._drag_initiated  = False
         self.setFixedSize(SLOT_W, SLOT_H)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setObjectName("ButtonSlot")
+        self.setAcceptDrops(True)
         self._setup_ui()
         self._refresh()
 
@@ -114,12 +124,89 @@ class ButtonSlot(QWidget):
         action = self._data.get("action")
         action_str = action.get("type", "—") if action else "keine Aktion"
         self.setToolTip(f"<b>Slot {idx}: {label}</b><br>Aktion: {action_str}"
-                        "<br><i>Klicken zum Bearbeiten</i>")
+                        "<br><i>Klicken zum Bearbeiten | Ziehen zum Tauschen</i>")
+
+    # ── Maus-Events: Klick vs. Drag unterscheiden ──────────────────────────────
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked_edit.emit(self._data)
+            self._drag_start_pos = event.pos()
+            self._drag_initiated = False
         super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if not (event.buttons() & Qt.MouseButton.LeftButton):
+            super().mouseMoveEvent(event)
+            return
+        if self._drag_start_pos is None:
+            super().mouseMoveEvent(event)
+            return
+        dist = (event.pos() - self._drag_start_pos).manhattanLength()
+        if dist < QApplication.startDragDistance():
+            super().mouseMoveEvent(event)
+            return
+        self._drag_initiated = True
+        self._start_drag()
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and not self._drag_initiated:
+            self.clicked_edit.emit(self._data)
+        self._drag_start_pos = None
+        self._drag_initiated = False
+        super().mouseReleaseEvent(event)
+
+    def _start_drag(self):
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setData(self._DRAG_MIME, str(self._data["index"]).encode())
+        drag.setMimeData(mime)
+        # Widget-Screenshot als Drag-Bild
+        pm = self.grab()
+        drag.setPixmap(pm)
+        drag.setHotSpot(pm.rect().center())
+        drag.exec(Qt.DropAction.MoveAction)
+
+    # ── Drop-Ziel ──────────────────────────────────────────────────────────────
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat(self._DRAG_MIME):
+            try:
+                src_idx = int(bytes(event.mimeData().data(self._DRAG_MIME)).decode())
+            except Exception:
+                event.ignore()
+                return
+            if src_idx != self._data["index"]:
+                self._set_drop_highlight(True)
+                event.acceptProposedAction()
+                return
+        event.ignore()
+
+    def dragLeaveEvent(self, event):
+        self._set_drop_highlight(False)
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        self._set_drop_highlight(False)
+        if event.mimeData().hasFormat(self._DRAG_MIME):
+            try:
+                src_idx = int(bytes(event.mimeData().data(self._DRAG_MIME)).decode())
+            except Exception:
+                event.ignore()
+                return
+            tgt_idx = self._data["index"]
+            if src_idx != tgt_idx:
+                self.swap_requested.emit(src_idx, tgt_idx)
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def _set_drop_highlight(self, on: bool):
+        self.setProperty("dropTarget", on)
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+    # ── Hover ──────────────────────────────────────────────────────────────────
 
     def enterEvent(self, event):
         self.setProperty("hovered", True)
@@ -214,16 +301,25 @@ class NavButtonSlot(QWidget):
 # ── KnobSlot ───────────────────────────────────────────────────────────────────
 
 class KnobSlot(QWidget):
-    """Darstellung eines Knobs mit Aktion-Label. Unterstützt variable Kreisgrößen."""
-    clicked_edit = Signal(dict)
+    """
+    Darstellung eines Knobs mit Aktion-Label. Unterstützt variable Kreisgrößen.
+    Unterstützt Drag & Drop zum Tauschen von Knobs untereinander.
+    """
+    clicked_edit   = Signal(dict)
+    swap_requested = Signal(int, int)   # (source_index, target_index)
+
+    _DRAG_MIME = "application/x-deckpad-knob"
 
     def __init__(self, knob_data: dict, diameter: int = KNOB_D_SMALL, parent=None):
         super().__init__(parent)
-        self._data = knob_data
-        self._d    = diameter
+        self._data            = knob_data
+        self._d               = diameter
+        self._drag_start_pos  = None
+        self._drag_initiated  = False
         self.setFixedSize(diameter + 24, diameter + 34)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setObjectName("KnobSlot")
+        self.setAcceptDrops(True)
         self._setup_ui()
         self._refresh()
 
@@ -237,11 +333,7 @@ class KnobSlot(QWidget):
         self._circle.setObjectName("KnobCircle")
         self._circle.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         # Border-radius inline setzen (abhängig von Diameter)
-        r = self._d // 2
-        fs = max(11, self._d // 5)
-        self._circle.setStyleSheet(
-            f"border-radius: {r}px; font-size: {fs}px;"
-        )
+        self._refresh_circle_style(highlight=False)
 
         self._label = QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
         self._label.setFixedHeight(16)
@@ -253,6 +345,14 @@ class KnobSlot(QWidget):
 
         layout.addWidget(self._circle, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._label,  0, Qt.AlignmentFlag.AlignCenter)
+
+    def _refresh_circle_style(self, highlight: bool = False):
+        r  = self._d // 2
+        fs = max(11, self._d // 5)
+        border_color = "#0A84FF" if highlight else "#636366"   # mauve : surface2
+        self._circle.setStyleSheet(
+            f"border-radius: {r}px; font-size: {fs}px; border-color: {border_color};"
+        )
 
     def _refresh(self):
         idx    = self._data.get("index", "?")
@@ -266,16 +366,85 @@ class KnobSlot(QWidget):
 
         atype = action.get("type", "—") if action else "keine Aktion"
         self.setToolTip(f"<b>Knob {idx}: {label}</b><br>Aktion: {atype}"
-                        "<br><i>Klicken zum Bearbeiten</i>")
+                        "<br><i>Klicken zum Bearbeiten | Ziehen zum Tauschen</i>")
 
     def update_data(self, knob_data: dict):
         self._data = knob_data
         self._refresh()
 
+    # ── Maus-Events: Klick vs. Drag unterscheiden ──────────────────────────────
+
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked_edit.emit(self._data)
+            self._drag_start_pos = event.pos()
+            self._drag_initiated = False
         super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if not (event.buttons() & Qt.MouseButton.LeftButton):
+            super().mouseMoveEvent(event)
+            return
+        if self._drag_start_pos is None:
+            super().mouseMoveEvent(event)
+            return
+        dist = (event.pos() - self._drag_start_pos).manhattanLength()
+        if dist < QApplication.startDragDistance():
+            super().mouseMoveEvent(event)
+            return
+        self._drag_initiated = True
+        self._start_drag()
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and not self._drag_initiated:
+            self.clicked_edit.emit(self._data)
+        self._drag_start_pos = None
+        self._drag_initiated = False
+        super().mouseReleaseEvent(event)
+
+    def _start_drag(self):
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setData(self._DRAG_MIME, str(self._data["index"]).encode())
+        drag.setMimeData(mime)
+        pm = self.grab()
+        drag.setPixmap(pm)
+        drag.setHotSpot(pm.rect().center())
+        drag.exec(Qt.DropAction.MoveAction)
+
+    # ── Drop-Ziel ──────────────────────────────────────────────────────────────
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat(self._DRAG_MIME):
+            try:
+                src_idx = int(bytes(event.mimeData().data(self._DRAG_MIME)).decode())
+            except Exception:
+                event.ignore()
+                return
+            if src_idx != self._data["index"]:
+                self._refresh_circle_style(highlight=True)
+                event.acceptProposedAction()
+                return
+        event.ignore()
+
+    def dragLeaveEvent(self, event):
+        self._refresh_circle_style(highlight=False)
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        self._refresh_circle_style(highlight=False)
+        if event.mimeData().hasFormat(self._DRAG_MIME):
+            try:
+                src_idx = int(bytes(event.mimeData().data(self._DRAG_MIME)).decode())
+            except Exception:
+                event.ignore()
+                return
+            tgt_idx = self._data["index"]
+            if src_idx != tgt_idx:
+                self.swap_requested.emit(src_idx, tgt_idx)
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
 
 # ── _DoubleClickLabel ──────────────────────────────────────────────────────────
@@ -301,6 +470,8 @@ class SceneWidget(QWidget):
     button_edit_requested     = Signal(int, dict)   # (btn_index, btn_data)
     knob_edit_requested       = Signal(int, dict)   # (knob_index, knob_data)
     nav_button_edit_requested = Signal(str, dict)   # (nav_id, nav_data)
+    buttons_swapped           = Signal(int, int)    # (src_btn_index, tgt_btn_index)
+    knobs_swapped             = Signal(int, int)    # (src_knob_index, tgt_knob_index)
     delete_requested          = Signal()
     rename_requested          = Signal()
     save_to_library_requested = Signal()
@@ -377,6 +548,7 @@ class SceneWidget(QWidget):
                 slot.clicked_edit.connect(
                     lambda d, i=idx: self.button_edit_requested.emit(i, d)
                 )
+                slot.swap_requested.connect(self.buttons_swapped)
                 self._btn_slots[idx] = slot
                 grid.addWidget(slot, row, col)
 
@@ -418,6 +590,7 @@ class SceneWidget(QWidget):
         large_knob.clicked_edit.connect(
             lambda d: self.knob_edit_requested.emit(1, d)
         )
+        large_knob.swap_requested.connect(self.knobs_swapped)
         self._knob_slots[1] = large_knob
         right_col.addWidget(large_knob, 0, Qt.AlignmentFlag.AlignCenter)
 
@@ -435,6 +608,7 @@ class SceneWidget(QWidget):
             slot.clicked_edit.connect(
                 lambda d, i=idx: self.knob_edit_requested.emit(i, d)
             )
+            slot.swap_requested.connect(self.knobs_swapped)
             self._knob_slots[idx] = slot
             small_row.addWidget(slot, 0, Qt.AlignmentFlag.AlignCenter)
 

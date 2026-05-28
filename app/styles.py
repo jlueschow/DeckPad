@@ -479,6 +479,11 @@ QWidget#ButtonSlot:hover {{
     border-color: {C["mauve"]};
 }}
 
+QWidget#ButtonSlot[dropTarget="true"] {{
+    background-color: {C["surface1"]};
+    border: 2px dashed {C["mauve"]};
+}}
+
 QWidget#KnobSlot {{
     background-color: transparent;
 }}
