@@ -36,6 +36,9 @@ a = Analysis(
     datas=[
         # Button-Bibliothek (read-only, wird beim ersten Start in User-Data kopiert)
         ("data/library/buttons.json", "data/library"),
+        # Generische Seiten-Presets (wird beim ersten Start in User-Data kopiert)
+        ("data/library/pages/logic_pro_transport.json", "data/library/pages"),
+        ("data/library/pages/logic_pro_files.json",     "data/library/pages"),
         # SF-Symbol-Icons für Bibliotheks-Buttons
         ("assets/icons",              "assets/icons"),
         # App-Icon (für Tray-Icon-Fallback)

@@ -42,12 +42,23 @@ def _init_user_data():
     pages_dir = os.path.join(lib_dir, "pages")
     os.makedirs(pages_dir, exist_ok=True)
 
+    import shutil
+
     # buttons.json aus Bundle kopieren falls noch nicht vorhanden
     if not os.path.exists(BUTTONS_PATH) and _BUNDLE_ASSETS:
         src = os.path.join(_BUNDLE_ASSETS, "data", "library", "buttons.json")
         if os.path.exists(src):
-            import shutil
             shutil.copy2(src, BUTTONS_PATH)
+
+    # Generische Seiten-Presets aus Bundle kopieren (nur falls noch nicht vorhanden)
+    if _BUNDLE_ASSETS:
+        bundle_pages = os.path.join(_BUNDLE_ASSETS, "data", "library", "pages")
+        if os.path.isdir(bundle_pages):
+            for fname in os.listdir(bundle_pages):
+                if fname.endswith(".json"):
+                    dst = os.path.join(pages_dir, fname)
+                    if not os.path.exists(dst):
+                        shutil.copy2(os.path.join(bundle_pages, fname), dst)
 
 
 class ConfigManager:
