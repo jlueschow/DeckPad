@@ -318,12 +318,19 @@ def _run_action(action: dict):
         subprocess.Popen(action.get("command", ""), shell=True)
     elif atype == "dante_route":
         dante_cfg = cfg.get().get("dante", {})
+        # Backward-Compat: altes Single-Route-Format → routes-Liste
+        if "routes" in action:
+            routes = action["routes"]
+        else:
+            routes = [{
+                "rx_device":  action.get("rx_device", ""),
+                "rx_channel": action.get("rx_channel", 1),
+                "tx_device":  action.get("tx_device", ""),
+                "tx_channel": action.get("tx_channel", ""),
+            }]
         try:
             result = actions.dante_route(
-                rx_device=action.get("rx_device", ""),
-                rx_channel=action.get("rx_channel", 1),
-                tx_device=action.get("tx_device", ""),
-                tx_channel=action.get("tx_channel", ""),
+                routes=routes,
                 host=dante_cfg.get("host", ""),
                 api_key=dante_cfg.get("api_key", ""),
             )

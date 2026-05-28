@@ -332,20 +332,18 @@ def send_shortcut(keys: str):
 
 # ── Dante DDM Routing ──────────────────────────────────────────────────────────
 
-def dante_route(rx_device: str, rx_channel: int,
-                tx_device: str, tx_channel: str,
-                host: str, api_key: str) -> str:
+def dante_route(routes: list, host: str, api_key: str) -> str:
     """
-    Setzt eine Dante-Audio-Route via DDM GraphQL API.
+    Setzt eine oder mehrere Dante-Audio-Routen sequenziell via DDM GraphQL API.
 
-    1. Sucht die UUID des RX-Geräts per Name-Lookup.
-    2. Setzt die Subscription via DeviceRxChannelsSubscriptionSet-Mutation.
+    routes: [{"rx_device": str, "rx_channel": int,
+              "tx_device": str, "tx_channel": str}, ...]
+
+    1. Holt alle Device-UUIDs mit einer einzigen Abfrage.
+    2. Setzt alle Subscriptions.
 
     Auth: Authorization: <RAW_KEY>  (kein "Bearer"-Prefix!)
     User-Agent muss PostmanRuntime/7.45.0 sein (DDM-Anforderung).
-
-    Returns: Status-String für Logging.
-    Raises:  ValueError / RuntimeError / urllib.error.URLError bei Fehler.
     """
     import urllib.request
     import urllib.error
@@ -353,6 +351,8 @@ def dante_route(rx_device: str, rx_channel: int,
 
     if not host or not api_key:
         raise ValueError("Dante DDM: Host oder API-Key nicht konfiguriert.")
+    if not routes:
+        return "Keine Routen konfiguriert."
 
     _headers = {
         "Content-Type": "application/json",
@@ -373,35 +373,43 @@ def dante_route(rx_device: str, rx_channel: int,
             raise RuntimeError(result["errors"][0]["message"])
         return result.get("data", {})
 
-    # ── Schritt 1: RX-Geräte-UUID auflösen ────────────────────────────────────
-    devices_data = _ddm("{ domains { name devices { id name } } }")
-    rx_id = None
+    # ── Alle Device-UUIDs auf einmal laden ────────────────────────────────────
+    uuid_map: dict = {}
+    devices_data = _ddm("{ domains { devices { id name } } }")
     for domain in devices_data.get("domains", []):
         for dev in domain["devices"]:
-            if dev["name"] == rx_device:
-                rx_id = dev["id"]
-                break
-        if rx_id:
-            break
+            uuid_map[dev["name"]] = dev["id"]
 
-    if not rx_id:
-        raise ValueError(f"Dante: RX-Gerät '{rx_device}' nicht gefunden.")
+    # ── Routen sequenziell setzen ─────────────────────────────────────────────
+    results = []
+    for route in routes:
+        rx_device  = route.get("rx_device", "")
+        rx_channel = route.get("rx_channel", 1)
+        tx_device  = route.get("tx_device", "")
+        tx_channel = route.get("tx_channel", "")
 
-    # ── Schritt 2: Route setzen ────────────────────────────────────────────────
-    _ddm("""
-    mutation($input: DeviceRxChannelsSubscriptionSetInput!) {
-      DeviceRxChannelsSubscriptionSet(input: $input) { __typename }
-    }
-    """, {
-        "input": {
-            "deviceId": rx_id,
-            "subscriptions": [{
-                "rxChannelIndex": rx_channel,
-                "subscribedDevice": tx_device,
-                "subscribedChannel": tx_channel,
-            }]
+        rx_id = uuid_map.get(rx_device)
+        if not rx_id:
+            raise ValueError(f"Dante: Gerät '{rx_device}' nicht gefunden.")
+
+        _ddm("""
+        mutation($input: DeviceRxChannelsSubscriptionSetInput!) {
+          DeviceRxChannelsSubscriptionSet(input: $input) { __typename }
         }
-    })
+        """, {
+            "input": {
+                "deviceId": rx_id,
+                "subscriptions": [{
+                    "rxChannelIndex": rx_channel,
+                    "subscribedDevice": tx_device,
+                    "subscribedChannel": tx_channel,
+                }]
+            }
+        })
+        results.append(
+            f"{tx_device}/{tx_channel!r} → {rx_device} RX {rx_channel}"
+        )
 
-    log(f"dante_route ▶ {tx_device}/{tx_channel!r} → {rx_device} RX {rx_channel}")
-    return f"Route gesetzt: {tx_device}/{tx_channel!r} → {rx_device} RX {rx_channel}"
+    summary = f"{len(results)} Route(n) gesetzt: " + "; ".join(results)
+    log(f"dante_route ▶ {summary}")
+    return summary

@@ -335,13 +335,13 @@ class ButtonEditorDialog(QDialog):
         sh_l.addRow("Befehl:", self._act_cmd)
         self._action_stack.addWidget(sh_w)
 
-        # 4: dante_route
+        # 4: dante_route — Mehrfach-Routen-Tabelle
         dante_w = QWidget()
-        dante_l = QFormLayout(dante_w)
-        dante_l.setSpacing(10)
-        dante_l.setContentsMargins(0, 4, 0, 4)
+        dante_outer = QVBoxLayout(dante_w)
+        dante_outer.setContentsMargins(0, 4, 0, 4)
+        dante_outer.setSpacing(6)
 
-        # Status-Zeile
+        # Status + Refresh
         dante_top = QHBoxLayout()
         self._dante_status_lbl = QLabel("Geräte werden geladen…")
         self._dante_status_lbl.setStyleSheet("color: #8E8E93; font-size: 11px;")
@@ -352,38 +352,52 @@ class ButtonEditorDialog(QDialog):
         dante_top.addWidget(self._dante_status_lbl)
         dante_top.addStretch()
         dante_top.addWidget(_dante_refresh_btn)
-        dante_l.addRow("", dante_top)
+        dante_outer.addLayout(dante_top)
 
-        # Empfänger (RX)
-        self._dante_rx_dev_combo = QComboBox()
-        self._dante_rx_dev_combo.setMinimumWidth(260)
-        self._dante_rx_dev_combo.currentIndexChanged.connect(
-            self._dante_on_rx_dev_changed
+        # Spalten-Header — gleiche Stretch-Gewichte wie die Zeilen (3-2-3-2 + 26 del)
+        _hdr = QWidget()
+        _hdr_l = QHBoxLayout(_hdr)
+        _hdr_l.setContentsMargins(2, 0, 30, 0)
+        _hdr_l.setSpacing(4)
+        for _title, _stretch in [
+            ("Empfänger-Gerät", 3), ("RX-Kanal", 2),
+            ("Sender-Gerät",    3), ("TX-Kanal",  2),
+        ]:
+            _lbl = QLabel(_title)
+            _lbl.setStyleSheet("color: #636366; font-size: 11px;")
+            _hdr_l.addWidget(_lbl, _stretch)
+        dante_outer.addWidget(_hdr)
+
+        # Scrollbarer Zeilen-Container
+        self._dante_routes_scroll = QScrollArea()
+        self._dante_routes_scroll.setWidgetResizable(True)
+        self._dante_routes_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
-        dante_l.addRow("Empfänger:", self._dante_rx_dev_combo)
+        self._dante_routes_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._dante_routes_scroll.setFixedHeight(148)
 
-        self._dante_rx_ch_combo = QComboBox()
-        self._dante_rx_ch_combo.setMinimumWidth(260)
-        dante_l.addRow("RX-Kanal:", self._dante_rx_ch_combo)
+        self._dante_rows_widget = QWidget()
+        self._dante_rows_layout = QVBoxLayout(self._dante_rows_widget)
+        self._dante_rows_layout.setContentsMargins(0, 0, 0, 0)
+        self._dante_rows_layout.setSpacing(4)
+        self._dante_rows_layout.addStretch()
+        self._dante_routes_scroll.setWidget(self._dante_rows_widget)
+        dante_outer.addWidget(self._dante_routes_scroll)
 
-        # Sender (TX)
-        self._dante_tx_dev_combo = QComboBox()
-        self._dante_tx_dev_combo.setMinimumWidth(260)
-        self._dante_tx_dev_combo.currentIndexChanged.connect(
-            self._dante_on_tx_dev_changed
-        )
-        dante_l.addRow("Sender:", self._dante_tx_dev_combo)
-
-        self._dante_tx_ch_combo = QComboBox()
-        self._dante_tx_ch_combo.setMinimumWidth(260)
-        dante_l.addRow("TX-Kanal:", self._dante_tx_ch_combo)
+        # Hinzufügen-Button
+        _add_btn = QPushButton("+ Route hinzufügen")
+        _add_btn.setObjectName("GhostButton")
+        _add_btn.clicked.connect(lambda: self._dante_add_route_row())
+        dante_outer.addWidget(_add_btn)
 
         self._action_stack.addWidget(dante_w)
 
-        # Laufzeit-State (werden NICHT im __init__ überschrieben — hier init)
-        self._dante_devices: list = []
-        self._dante_pending: dict = {}
-        self._dante_loader: _DanteDeviceLoader | None = None
+        # Laufzeit-State
+        self._dante_devices:    list = []
+        self._dante_pending:    dict = {}
+        self._dante_loader:     _DanteDeviceLoader | None = None
+        self._dante_route_rows: list = []   # [{"rx_dev":CB,"rx_ch":CB,"tx_dev":CB,"tx_ch":CB,"widget":QWidget}]
 
         # 5: open_config
         cfg_w = QWidget()
@@ -589,12 +603,19 @@ class ButtonEditorDialog(QDialog):
             # _on_action_type_changed startet den Loader sofort, er muss die
             # Werte schon vorfinden, bevor er _dante_restore_pending() aufruft.
             if atype == "dante_route":
-                self._dante_pending = {
-                    "rx_device": action.get("rx_device", ""),
-                    "rx_channel": action.get("rx_channel", 1),
-                    "tx_device":  action.get("tx_device", ""),
-                    "tx_channel": action.get("tx_channel", ""),
-                }
+                # Backward-Compat: altes Single-Route-Format → routes-Liste
+                if "routes" in action:
+                    routes = action["routes"]
+                elif action.get("rx_device") or action.get("tx_device"):
+                    routes = [{
+                        "rx_device": action.get("rx_device", ""),
+                        "rx_channel": action.get("rx_channel", 1),
+                        "tx_device":  action.get("tx_device", ""),
+                        "tx_channel": action.get("tx_channel", ""),
+                    }]
+                else:
+                    routes = []
+                self._dante_pending = {"routes": routes}
 
             self._action_combo.setCurrentIndex(_type_index(ACTION_TYPES, atype))
             # ↑ feuert _on_action_type_changed → startet Loader falls dante_route
@@ -629,55 +650,37 @@ class ButtonEditorDialog(QDialog):
         elif akey == "dante_route" and not self._dante_devices:
             self._dante_load_devices()
 
-    # ── Dante DDM Geräte-Auswahl ──────────────────────────────────────────────
+    # ── Dante DDM — Laden ────────────────────────────────────────────────────
 
     def _dante_load_devices(self):
         """Startet den DDM-Geräte-Loader (Hintergrund-Thread, non-blocking)."""
         dante_cfg = cfg.get().get("dante", {})
-        host    = dante_cfg.get("host", "")
-        api_key = dante_cfg.get("api_key", "")
-
         self._dante_status_lbl.setText("Geräte werden geladen…")
         self._dante_status_lbl.setStyleSheet("color: #8E8E93; font-size: 11px;")
-
-        # Alten Thread aufräumen
         if self._dante_loader and self._dante_loader.isRunning():
             self._dante_loader.quit()
             self._dante_loader.wait(500)
-
-        self._dante_loader = _DanteDeviceLoader(host, api_key, self)
+        self._dante_loader = _DanteDeviceLoader(
+            dante_cfg.get("host", ""), dante_cfg.get("api_key", ""), self
+        )
         self._dante_loader.devices_loaded.connect(self._dante_on_devices_loaded)
         self._dante_loader.load_failed.connect(self._dante_on_load_failed)
         self._dante_loader.start()
 
     def _dante_on_devices_loaded(self, devices: list):
-        """Befüllt Empfänger- und Sender-ComboBoxen mit den geladenen Gerätedaten."""
         self._dante_devices = devices
-
-        # Geräte mit RX-Kanälen → Empfänger-Combo
         rx_devs = [d for d in devices if d["rx"]]
-        # Geräte mit TX-Kanälen → Sender-Combo
         tx_devs = [d for d in devices if d["tx"]]
 
-        self._dante_rx_dev_combo.blockSignals(True)
-        self._dante_rx_dev_combo.clear()
-        for d in rx_devs:
-            self._dante_rx_dev_combo.addItem(d["name"], d["name"])
-        self._dante_rx_dev_combo.blockSignals(False)
+        # Bestehende Zeilen aktualisieren (falls schon vorhanden)
+        for row in self._dante_route_rows:
+            self._dante_repopulate_row(row)
 
-        self._dante_tx_dev_combo.blockSignals(True)
-        self._dante_tx_dev_combo.clear()
-        for d in tx_devs:
-            self._dante_tx_dev_combo.addItem(d["name"], d["name"])
-        self._dante_tx_dev_combo.blockSignals(False)
-
-        # Kanäle für erste Geräte füllen
-        self._dante_on_rx_dev_changed(0)
-        self._dante_on_tx_dev_changed(0)
-
-        # Gespeicherte Werte wiederherstellen falls vorhanden
+        # Gespeicherte Routen restaurieren oder erste leere Zeile anlegen
         if self._dante_pending:
             self._dante_restore_pending()
+        elif not self._dante_route_rows:
+            self._dante_add_route_row()
 
         self._dante_status_lbl.setText(
             f"{len(rx_devs)} Empfänger, {len(tx_devs)} Sender geladen."
@@ -688,55 +691,207 @@ class ButtonEditorDialog(QDialog):
         self._dante_status_lbl.setText(f"Fehler: {msg}")
         self._dante_status_lbl.setStyleSheet("color: #FF453A; font-size: 11px;")
 
-    def _dante_on_rx_dev_changed(self, idx: int):
-        """Aktualisiert die RX-Kanal-Combo wenn das Empfänger-Gerät wechselt."""
-        dev_name = self._dante_rx_dev_combo.itemData(idx)
+    # ── Dante DDM — Zeilen-Verwaltung ────────────────────────────────────────
+
+    def _dante_add_route_row(self, rx_dev_name="", rx_ch_val=None,
+                              tx_dev_name="", tx_ch_name=""):
+        """
+        Fügt eine neue Route-Zeile hinzu.
+        Ohne Argumente: Auto-Fill aus der letzten Zeile (nächsthöherer Kanal).
+        """
+        # Auto-Fill: letzte Zeile als Vorlage, nächsten Kanal wählen
+        if not rx_dev_name and self._dante_route_rows:
+            last = self._dante_route_rows[-1]
+            rx_dev_name = last["rx_dev"].currentData() or ""
+            tx_dev_name = last["tx_dev"].currentData() or ""
+            last_rx_ch  = last["rx_ch"].currentData()
+            last_tx_ch  = last["tx_ch"].currentData()
+            rx_ch_val   = self._dante_next_rx_ch(rx_dev_name, last_rx_ch)
+            tx_ch_name  = self._dante_next_tx_ch(tx_dev_name, last_tx_ch)
+
+        # Widget für diese Zeile
+        row_w = QWidget()
+        row_l = QHBoxLayout(row_w)
+        row_l.setContentsMargins(0, 0, 0, 0)
+        row_l.setSpacing(4)
+
+        rx_dev = QComboBox(); rx_dev.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        rx_ch  = QComboBox(); rx_ch.setSizePolicy(QSizePolicy.Policy.Expanding,  QSizePolicy.Policy.Fixed)
+        tx_dev = QComboBox(); tx_dev.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        tx_ch  = QComboBox(); tx_ch.setSizePolicy(QSizePolicy.Policy.Expanding,  QSizePolicy.Policy.Fixed)
+
+        del_btn = QPushButton("×")
+        del_btn.setFixedSize(26, 26)
+        del_btn.setStyleSheet(
+            "QPushButton { color: #FF453A; background: transparent; "
+            "border: 1px solid #3A3A3C; border-radius: 4px; font-weight: bold; }"
+            "QPushButton:hover { background: #3A3A3C; }"
+        )
+
+        row_l.addWidget(rx_dev, 3)
+        row_l.addWidget(rx_ch,  2)
+        row_l.addWidget(tx_dev, 3)
+        row_l.addWidget(tx_ch,  2)
+        row_l.addWidget(del_btn)
+
+        row = {
+            "rx_dev": rx_dev, "rx_ch": rx_ch,
+            "tx_dev": tx_dev, "tx_ch": tx_ch,
+            "widget": row_w,
+        }
+        self._dante_route_rows.append(row)
+
+        # Signals
+        rx_dev.currentIndexChanged.connect(
+            lambda idx, r=row: self._dante_on_row_rx_dev_changed(r, idx)
+        )
+        tx_dev.currentIndexChanged.connect(
+            lambda idx, r=row: self._dante_on_row_tx_dev_changed(r, idx)
+        )
+        del_btn.clicked.connect(lambda _checked=False, r=row: self._dante_remove_row(r))
+
+        # Vor dem Stretch einfügen
+        stretch_pos = self._dante_rows_layout.count() - 1
+        self._dante_rows_layout.insertWidget(stretch_pos, row_w)
+
+        # Geräte eintragen (falls schon geladen)
+        if self._dante_devices:
+            for d in [d for d in self._dante_devices if d["rx"]]:
+                rx_dev.addItem(d["name"], d["name"])
+            for d in [d for d in self._dante_devices if d["tx"]]:
+                tx_dev.addItem(d["name"], d["name"])
+
+        # Gewünschte Werte setzen
+        if rx_dev_name:
+            i = rx_dev.findData(rx_dev_name)
+            if i >= 0:
+                rx_dev.setCurrentIndex(i)
+        self._dante_on_row_rx_dev_changed(row, rx_dev.currentIndex())
+        if rx_ch_val is not None:
+            i = rx_ch.findData(rx_ch_val)
+            if i >= 0:
+                rx_ch.setCurrentIndex(i)
+
+        if tx_dev_name:
+            i = tx_dev.findData(tx_dev_name)
+            if i >= 0:
+                tx_dev.setCurrentIndex(i)
+        self._dante_on_row_tx_dev_changed(row, tx_dev.currentIndex())
+        if tx_ch_name:
+            i = tx_ch.findData(tx_ch_name)
+            if i >= 0:
+                tx_ch.setCurrentIndex(i)
+
+    def _dante_remove_row(self, row: dict):
+        """Entfernt eine Route-Zeile."""
+        if row in self._dante_route_rows:
+            self._dante_route_rows.remove(row)
+        row["widget"].deleteLater()
+
+    def _dante_repopulate_row(self, row: dict):
+        """Aktualisiert die Geräte-Combos einer Zeile nach dem Laden der Geräteliste."""
+        cur = {
+            "rx_dev": row["rx_dev"].currentData(),
+            "rx_ch":  row["rx_ch"].currentData(),
+            "tx_dev": row["tx_dev"].currentData(),
+            "tx_ch":  row["tx_ch"].currentData(),
+        }
+        row["rx_dev"].blockSignals(True)
+        row["rx_dev"].clear()
+        for d in [d for d in self._dante_devices if d["rx"]]:
+            row["rx_dev"].addItem(d["name"], d["name"])
+        row["rx_dev"].blockSignals(False)
+
+        row["tx_dev"].blockSignals(True)
+        row["tx_dev"].clear()
+        for d in [d for d in self._dante_devices if d["tx"]]:
+            row["tx_dev"].addItem(d["name"], d["name"])
+        row["tx_dev"].blockSignals(False)
+
+        # Alte Auswahl wiederherstellen
+        i = row["rx_dev"].findData(cur["rx_dev"])
+        if i >= 0:
+            row["rx_dev"].setCurrentIndex(i)
+        self._dante_on_row_rx_dev_changed(row, row["rx_dev"].currentIndex())
+        i = row["rx_ch"].findData(cur["rx_ch"])
+        if i >= 0:
+            row["rx_ch"].setCurrentIndex(i)
+
+        i = row["tx_dev"].findData(cur["tx_dev"])
+        if i >= 0:
+            row["tx_dev"].setCurrentIndex(i)
+        self._dante_on_row_tx_dev_changed(row, row["tx_dev"].currentIndex())
+        i = row["tx_ch"].findData(cur["tx_ch"])
+        if i >= 0:
+            row["tx_ch"].setCurrentIndex(i)
+
+    def _dante_on_row_rx_dev_changed(self, row: dict, idx: int):
+        dev_name = row["rx_dev"].itemData(idx)
         dev = next((d for d in self._dante_devices if d["name"] == dev_name), None)
-        self._dante_rx_ch_combo.blockSignals(True)
-        self._dante_rx_ch_combo.clear()
+        row["rx_ch"].blockSignals(True)
+        row["rx_ch"].clear()
         if dev:
             for ch in sorted(dev["rx"], key=lambda c: c["index"]):
                 busy  = "  [belegt]" if ch.get("subscribedDevice") else ""
-                label = f"{ch['index']} — {ch['name']}{busy}"
-                self._dante_rx_ch_combo.addItem(label, ch["index"])
-        self._dante_rx_ch_combo.blockSignals(False)
+                row["rx_ch"].addItem(f"{ch['index']} — {ch['name']}{busy}", ch["index"])
+        row["rx_ch"].blockSignals(False)
 
-    def _dante_on_tx_dev_changed(self, idx: int):
-        """Aktualisiert die TX-Kanal-Combo wenn das Sender-Gerät wechselt."""
-        dev_name = self._dante_tx_dev_combo.itemData(idx)
+    def _dante_on_row_tx_dev_changed(self, row: dict, idx: int):
+        dev_name = row["tx_dev"].itemData(idx)
         dev = next((d for d in self._dante_devices if d["name"] == dev_name), None)
-        self._dante_tx_ch_combo.blockSignals(True)
-        self._dante_tx_ch_combo.clear()
+        row["tx_ch"].blockSignals(True)
+        row["tx_ch"].clear()
         if dev:
             for ch in sorted(dev["tx"], key=lambda c: c["index"]):
-                self._dante_tx_ch_combo.addItem(ch["name"], ch["name"])
-        self._dante_tx_ch_combo.blockSignals(False)
+                row["tx_ch"].addItem(ch["name"], ch["name"])
+        row["tx_ch"].blockSignals(False)
+
+    def _dante_next_rx_ch(self, dev_name: str, last_idx) -> int:
+        """Gibt den nächsthöheren RX-Kanalindex zurück (gleiche Sortierreihenfolge)."""
+        dev = next((d for d in self._dante_devices if d["name"] == dev_name), None)
+        if not dev or last_idx is None:
+            return 1
+        indices = sorted(ch["index"] for ch in dev["rx"])
+        for i in indices:
+            if i > last_idx:
+                return i
+        return last_idx  # kein höherer → letzten beibehalten
+
+    def _dante_next_tx_ch(self, dev_name: str, last_name: str) -> str:
+        """Gibt den nächsten TX-Kanal zurück (nach Position in der sortierten Liste)."""
+        dev = next((d for d in self._dante_devices if d["name"] == dev_name), None)
+        if not dev:
+            return last_name
+        names = [ch["name"] for ch in sorted(dev["tx"], key=lambda c: c["index"])]
+        if last_name in names:
+            pos = names.index(last_name)
+            if pos + 1 < len(names):
+                return names[pos + 1]
+        return last_name
 
     def _dante_restore_pending(self):
-        """Setzt Combo-Auswahl auf die in _dante_pending gespeicherten Werte."""
+        """Stellt alle Routen aus _dante_pending wieder her."""
         p = self._dante_pending
         if not p:
             return
+        routes = p.get("routes", [])
 
-        # RX-Gerät
-        i = self._dante_rx_dev_combo.findData(p.get("rx_device", ""))
-        if i >= 0:
-            self._dante_rx_dev_combo.setCurrentIndex(i)
-            self._dante_on_rx_dev_changed(i)
-        # RX-Kanal
-        i = self._dante_rx_ch_combo.findData(p.get("rx_channel", 1))
-        if i >= 0:
-            self._dante_rx_ch_combo.setCurrentIndex(i)
+        # Alle alten Zeilen entfernen
+        for row in list(self._dante_route_rows):
+            self._dante_route_rows.remove(row)
+            row["widget"].deleteLater()
 
-        # TX-Gerät
-        i = self._dante_tx_dev_combo.findData(p.get("tx_device", ""))
-        if i >= 0:
-            self._dante_tx_dev_combo.setCurrentIndex(i)
-            self._dante_on_tx_dev_changed(i)
-        # TX-Kanal
-        i = self._dante_tx_ch_combo.findData(p.get("tx_channel", ""))
-        if i >= 0:
-            self._dante_tx_ch_combo.setCurrentIndex(i)
+        # Neue Zeilen aus gespeicherten Routen
+        for route in routes:
+            self._dante_add_route_row(
+                rx_dev_name=route.get("rx_device", ""),
+                rx_ch_val=route.get("rx_channel", 1),
+                tx_dev_name=route.get("tx_device", ""),
+                tx_ch_name=route.get("tx_channel", ""),
+            )
+
+        if not routes:
+            self._dante_add_route_row()  # mind. eine leere Zeile
 
         self._dante_pending = {}
 
@@ -864,10 +1019,15 @@ class ButtonEditorDialog(QDialog):
         elif atype_key == "dante_route":
             data["action"] = {
                 "type": "dante_route",
-                "rx_device": self._dante_rx_dev_combo.currentData() or "",
-                "rx_channel": self._dante_rx_ch_combo.currentData() or 1,
-                "tx_device":  self._dante_tx_dev_combo.currentData() or "",
-                "tx_channel": self._dante_tx_ch_combo.currentData() or "",
+                "routes": [
+                    {
+                        "rx_device": r["rx_dev"].currentData() or "",
+                        "rx_channel": r["rx_ch"].currentData() or 1,
+                        "tx_device":  r["tx_dev"].currentData() or "",
+                        "tx_channel": r["tx_ch"].currentData() or "",
+                    }
+                    for r in self._dante_route_rows
+                ],
             }
         elif atype_key == "open_config":
             data["action"] = {"type": "open_config"}
@@ -975,16 +1135,21 @@ class ButtonEditorDialog(QDialog):
             elif atype == "shell":
                 self._act_cmd.setText(action.get("command", ""))
             elif atype == "dante_route":
-                self._dante_pending = {
-                    "rx_device": action.get("rx_device", ""),
-                    "rx_channel": action.get("rx_channel", 1),
-                    "tx_device":  action.get("tx_device", ""),
-                    "tx_channel": action.get("tx_channel", ""),
-                }
+                if "routes" in action:
+                    routes = action["routes"]
+                elif action.get("rx_device"):
+                    routes = [{
+                        "rx_device": action.get("rx_device", ""),
+                        "rx_channel": action.get("rx_channel", 1),
+                        "tx_device":  action.get("tx_device", ""),
+                        "tx_channel": action.get("tx_channel", ""),
+                    }]
+                else:
+                    routes = []
+                self._dante_pending = {"routes": routes}
                 if self._dante_devices:
-                    # Geräte schon geladen → sofort einsetzen
                     self._dante_restore_pending()
-                # Andernfalls setzt _dante_on_devices_loaded die Werte nach dem Laden
+                # Andernfalls restauriert _dante_on_devices_loaded nach dem Laden
 
             # Icon
             icon = btn.get("icon") or {}
