@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox, QFileDialog, QWidget, QFrame, QSizePolicy,
     QStackedWidget, QSpinBox, QColorDialog, QScrollArea, QSplitter
 )
-from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtCore import Qt, Signal, QSize, QThread
 from PySide6.QtGui import QPixmap, QFont, QColor
 
 from app.scene_widget import _icon_to_pixmap
@@ -75,6 +75,67 @@ def _type_index(items: list, key: str, default: int = 0) -> int:
         if k == key:
             return i
     return default
+
+
+# ── _DanteDeviceLoader ────────────────────────────────────────────────────────
+
+class _DanteDeviceLoader(QThread):
+    """
+    Lädt die Dante-Geräteliste (TX- + RX-Kanäle) im Hintergrund-Thread.
+    Kein Qt-Blocking auf dem Main-Thread.
+    """
+    devices_loaded = Signal(list)   # [{"name": str, "tx": [...], "rx": [...]}]
+    load_failed    = Signal(str)    # Fehlermeldung
+
+    def __init__(self, host: str, api_key: str, parent=None):
+        super().__init__(parent)
+        self._host    = host
+        self._api_key = api_key
+
+    def run(self):
+        import urllib.request
+        import urllib.error
+        import json as _json
+
+        if not self._host:
+            self.load_failed.emit(
+                "DDM-Host nicht konfiguriert — Einstellungen → Dante DDM."
+            )
+            return
+        try:
+            payload = _json.dumps({"query": (
+                "{ domains { name devices { name "
+                "txChannels { index name } "
+                "rxChannels { index name subscribedDevice } } } }"
+            )}).encode("utf-8")
+            req = urllib.request.Request(
+                f"{self._host.rstrip('/')}/graphql",
+                data=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": self._api_key,
+                    "User-Agent": "PostmanRuntime/7.45.0",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = _json.loads(resp.read().decode("utf-8"))
+            if "errors" in data:
+                self.load_failed.emit(data["errors"][0]["message"])
+                return
+            devices: list = []
+            for domain in data.get("data", {}).get("domains", []):
+                for dev in domain["devices"]:
+                    devices.append({
+                        "name": dev["name"],
+                        "tx":   dev.get("txChannels", []),
+                        "rx":   dev.get("rxChannels", []),
+                    })
+            self.devices_loaded.emit(devices)
+        except urllib.error.URLError as e:
+            self.load_failed.emit(f"DDM nicht erreichbar: {e.reason}")
+        except Exception as e:
+            self.load_failed.emit(str(e))
 
 
 # ── _LibraryButtonCard ─────────────────────────────────────────────────────────
@@ -279,26 +340,50 @@ class ButtonEditorDialog(QDialog):
         dante_l = QFormLayout(dante_w)
         dante_l.setSpacing(10)
         dante_l.setContentsMargins(0, 4, 0, 4)
-        self._act_dante_rx_dev = QLineEdit()
-        self._act_dante_rx_dev.setPlaceholderText("z. B. 7-313-NIO500-A16")
-        self._act_dante_rx_ch = QSpinBox()
-        self._act_dante_rx_ch.setRange(1, 64)
-        self._act_dante_rx_ch.setValue(1)
-        self._act_dante_tx_dev = QLineEdit()
-        self._act_dante_tx_dev.setPlaceholderText("z. B. 7-313-NIO500-A8D8")
-        self._act_dante_tx_ch = QLineEdit()
-        self._act_dante_tx_ch.setPlaceholderText("z. B. arthur mix L")
-        dante_hint = QLabel(
-            "DDM-Host und API-Key in Einstellungen → Dante DDM konfigurieren."
+
+        # Status-Zeile
+        dante_top = QHBoxLayout()
+        self._dante_status_lbl = QLabel("Geräte werden geladen…")
+        self._dante_status_lbl.setStyleSheet("color: #8E8E93; font-size: 11px;")
+        _dante_refresh_btn = QPushButton("Aktualisieren")
+        _dante_refresh_btn.setObjectName("GhostButton")
+        _dante_refresh_btn.setFixedWidth(110)
+        _dante_refresh_btn.clicked.connect(self._dante_load_devices)
+        dante_top.addWidget(self._dante_status_lbl)
+        dante_top.addStretch()
+        dante_top.addWidget(_dante_refresh_btn)
+        dante_l.addRow("", dante_top)
+
+        # Empfänger (RX)
+        self._dante_rx_dev_combo = QComboBox()
+        self._dante_rx_dev_combo.setMinimumWidth(260)
+        self._dante_rx_dev_combo.currentIndexChanged.connect(
+            self._dante_on_rx_dev_changed
         )
-        dante_hint.setWordWrap(True)
-        dante_hint.setStyleSheet("color: #8E8E93; font-size: 11px;")
-        dante_l.addRow("RX Ger\xe4t:", self._act_dante_rx_dev)
-        dante_l.addRow("RX Kanal:", self._act_dante_rx_ch)
-        dante_l.addRow("TX Ger\xe4t:", self._act_dante_tx_dev)
-        dante_l.addRow("TX Kanal:", self._act_dante_tx_ch)
-        dante_l.addRow("", dante_hint)
+        dante_l.addRow("Empfänger:", self._dante_rx_dev_combo)
+
+        self._dante_rx_ch_combo = QComboBox()
+        self._dante_rx_ch_combo.setMinimumWidth(260)
+        dante_l.addRow("RX-Kanal:", self._dante_rx_ch_combo)
+
+        # Sender (TX)
+        self._dante_tx_dev_combo = QComboBox()
+        self._dante_tx_dev_combo.setMinimumWidth(260)
+        self._dante_tx_dev_combo.currentIndexChanged.connect(
+            self._dante_on_tx_dev_changed
+        )
+        dante_l.addRow("Sender:", self._dante_tx_dev_combo)
+
+        self._dante_tx_ch_combo = QComboBox()
+        self._dante_tx_ch_combo.setMinimumWidth(260)
+        dante_l.addRow("TX-Kanal:", self._dante_tx_ch_combo)
+
         self._action_stack.addWidget(dante_w)
+
+        # Laufzeit-State (werden NICHT im __init__ überschrieben — hier init)
+        self._dante_devices: list = []
+        self._dante_pending: dict = {}
+        self._dante_loader: _DanteDeviceLoader | None = None
 
         # 5: open_config
         cfg_w = QWidget()
@@ -506,10 +591,16 @@ class ButtonEditorDialog(QDialog):
             self._act_url.setText(action.get("url", ""))
             self._act_keys.setText(action.get("keys", ""))
             self._act_cmd.setText(action.get("command", ""))
-            self._act_dante_rx_dev.setText(action.get("rx_device", ""))
-            self._act_dante_rx_ch.setValue(action.get("rx_channel", 1))
-            self._act_dante_tx_dev.setText(action.get("tx_device", ""))
-            self._act_dante_tx_ch.setText(action.get("tx_channel", ""))
+
+            # dante_route: gespeicherte Werte merken → nach Gerätelade einsetzen
+            if atype == "dante_route":
+                self._dante_pending = {
+                    "rx_device": action.get("rx_device", ""),
+                    "rx_channel": action.get("rx_channel", 1),
+                    "tx_device":  action.get("tx_device", ""),
+                    "tx_channel": action.get("tx_channel", ""),
+                }
+                self._dante_load_devices()
 
             self._update_preview()
         finally:
@@ -527,9 +618,124 @@ class ButtonEditorDialog(QDialog):
 
     def _on_action_type_changed(self, idx):
         self._action_stack.setCurrentIndex(idx)
+        akey = ACTION_TYPES[idx][0]
         # Bei "App öffnen": automatisch App-Browser öffnen — aber nicht beim Laden
-        if not self._loading and ACTION_TYPES[idx][0] == "open_app":
+        if not self._loading and akey == "open_app":
             self._browse_for_open_app()
+        # Bei "Dante Routing": Geräteliste laden (falls noch nicht geschehen)
+        elif akey == "dante_route" and not self._dante_devices:
+            self._dante_load_devices()
+
+    # ── Dante DDM Geräte-Auswahl ──────────────────────────────────────────────
+
+    def _dante_load_devices(self):
+        """Startet den DDM-Geräte-Loader (Hintergrund-Thread, non-blocking)."""
+        dante_cfg = cfg.get().get("dante", {})
+        host    = dante_cfg.get("host", "")
+        api_key = dante_cfg.get("api_key", "")
+
+        self._dante_status_lbl.setText("Geräte werden geladen…")
+        self._dante_status_lbl.setStyleSheet("color: #8E8E93; font-size: 11px;")
+
+        # Alten Thread aufräumen
+        if self._dante_loader and self._dante_loader.isRunning():
+            self._dante_loader.quit()
+            self._dante_loader.wait(500)
+
+        self._dante_loader = _DanteDeviceLoader(host, api_key, self)
+        self._dante_loader.devices_loaded.connect(self._dante_on_devices_loaded)
+        self._dante_loader.load_failed.connect(self._dante_on_load_failed)
+        self._dante_loader.start()
+
+    def _dante_on_devices_loaded(self, devices: list):
+        """Befüllt Empfänger- und Sender-ComboBoxen mit den geladenen Gerätedaten."""
+        self._dante_devices = devices
+
+        # Geräte mit RX-Kanälen → Empfänger-Combo
+        rx_devs = [d for d in devices if d["rx"]]
+        # Geräte mit TX-Kanälen → Sender-Combo
+        tx_devs = [d for d in devices if d["tx"]]
+
+        self._dante_rx_dev_combo.blockSignals(True)
+        self._dante_rx_dev_combo.clear()
+        for d in rx_devs:
+            self._dante_rx_dev_combo.addItem(d["name"], d["name"])
+        self._dante_rx_dev_combo.blockSignals(False)
+
+        self._dante_tx_dev_combo.blockSignals(True)
+        self._dante_tx_dev_combo.clear()
+        for d in tx_devs:
+            self._dante_tx_dev_combo.addItem(d["name"], d["name"])
+        self._dante_tx_dev_combo.blockSignals(False)
+
+        # Kanäle für erste Geräte füllen
+        self._dante_on_rx_dev_changed(0)
+        self._dante_on_tx_dev_changed(0)
+
+        # Gespeicherte Werte wiederherstellen falls vorhanden
+        if self._dante_pending:
+            self._dante_restore_pending()
+
+        self._dante_status_lbl.setText(
+            f"{len(rx_devs)} Empfänger, {len(tx_devs)} Sender geladen."
+        )
+        self._dante_status_lbl.setStyleSheet("color: #30D158; font-size: 11px;")
+
+    def _dante_on_load_failed(self, msg: str):
+        self._dante_status_lbl.setText(f"Fehler: {msg}")
+        self._dante_status_lbl.setStyleSheet("color: #FF453A; font-size: 11px;")
+
+    def _dante_on_rx_dev_changed(self, idx: int):
+        """Aktualisiert die RX-Kanal-Combo wenn das Empfänger-Gerät wechselt."""
+        dev_name = self._dante_rx_dev_combo.itemData(idx)
+        dev = next((d for d in self._dante_devices if d["name"] == dev_name), None)
+        self._dante_rx_ch_combo.blockSignals(True)
+        self._dante_rx_ch_combo.clear()
+        if dev:
+            for ch in sorted(dev["rx"], key=lambda c: c["index"]):
+                busy  = "  [belegt]" if ch.get("subscribedDevice") else ""
+                label = f"{ch['index']} — {ch['name']}{busy}"
+                self._dante_rx_ch_combo.addItem(label, ch["index"])
+        self._dante_rx_ch_combo.blockSignals(False)
+
+    def _dante_on_tx_dev_changed(self, idx: int):
+        """Aktualisiert die TX-Kanal-Combo wenn das Sender-Gerät wechselt."""
+        dev_name = self._dante_tx_dev_combo.itemData(idx)
+        dev = next((d for d in self._dante_devices if d["name"] == dev_name), None)
+        self._dante_tx_ch_combo.blockSignals(True)
+        self._dante_tx_ch_combo.clear()
+        if dev:
+            for ch in sorted(dev["tx"], key=lambda c: c["index"]):
+                self._dante_tx_ch_combo.addItem(ch["name"], ch["name"])
+        self._dante_tx_ch_combo.blockSignals(False)
+
+    def _dante_restore_pending(self):
+        """Setzt Combo-Auswahl auf die in _dante_pending gespeicherten Werte."""
+        p = self._dante_pending
+        if not p:
+            return
+
+        # RX-Gerät
+        i = self._dante_rx_dev_combo.findData(p.get("rx_device", ""))
+        if i >= 0:
+            self._dante_rx_dev_combo.setCurrentIndex(i)
+            self._dante_on_rx_dev_changed(i)
+        # RX-Kanal
+        i = self._dante_rx_ch_combo.findData(p.get("rx_channel", 1))
+        if i >= 0:
+            self._dante_rx_ch_combo.setCurrentIndex(i)
+
+        # TX-Gerät
+        i = self._dante_tx_dev_combo.findData(p.get("tx_device", ""))
+        if i >= 0:
+            self._dante_tx_dev_combo.setCurrentIndex(i)
+            self._dante_on_tx_dev_changed(i)
+        # TX-Kanal
+        i = self._dante_tx_ch_combo.findData(p.get("tx_channel", ""))
+        if i >= 0:
+            self._dante_tx_ch_combo.setCurrentIndex(i)
+
+        self._dante_pending = {}
 
     def _browse_for_open_app(self):
         """
@@ -655,10 +861,10 @@ class ButtonEditorDialog(QDialog):
         elif atype_key == "dante_route":
             data["action"] = {
                 "type": "dante_route",
-                "rx_device": self._act_dante_rx_dev.text(),
-                "rx_channel": self._act_dante_rx_ch.value(),
-                "tx_device": self._act_dante_tx_dev.text(),
-                "tx_channel": self._act_dante_tx_ch.text(),
+                "rx_device": self._dante_rx_dev_combo.currentData() or "",
+                "rx_channel": self._dante_rx_ch_combo.currentData() or 1,
+                "tx_device":  self._dante_tx_dev_combo.currentData() or "",
+                "tx_channel": self._dante_tx_ch_combo.currentData() or "",
             }
         elif atype_key == "open_config":
             data["action"] = {"type": "open_config"}
@@ -766,10 +972,16 @@ class ButtonEditorDialog(QDialog):
             elif atype == "shell":
                 self._act_cmd.setText(action.get("command", ""))
             elif atype == "dante_route":
-                self._act_dante_rx_dev.setText(action.get("rx_device", ""))
-                self._act_dante_rx_ch.setValue(action.get("rx_channel", 1))
-                self._act_dante_tx_dev.setText(action.get("tx_device", ""))
-                self._act_dante_tx_ch.setText(action.get("tx_channel", ""))
+                self._dante_pending = {
+                    "rx_device": action.get("rx_device", ""),
+                    "rx_channel": action.get("rx_channel", 1),
+                    "tx_device":  action.get("tx_device", ""),
+                    "tx_channel": action.get("tx_channel", ""),
+                }
+                if self._dante_devices:
+                    # Geräte schon geladen → sofort einsetzen
+                    self._dante_restore_pending()
+                # Andernfalls setzt _dante_on_devices_loaded die Werte nach dem Laden
 
             # Icon
             icon = btn.get("icon") or {}
