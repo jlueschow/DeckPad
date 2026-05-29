@@ -549,49 +549,66 @@ class ConfigWindow(QMainWindow):
     # ── Einstellungen-Tab ──────────────────────────────────────────────────────
 
     def _setup_settings_tab(self):
-        layout = QVBoxLayout(self._settings_tab)
-        layout.setContentsMargins(24, 24, 24, 24)
+        # Äußeres Layout: nur die ScrollArea
+        outer = QVBoxLayout(self._settings_tab)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        outer.addWidget(scroll)
+
+        content = QWidget()
+        scroll.setWidget(content)
+
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(32, 28, 32, 28)
         layout.setSpacing(20)
 
-        # Gerät-Abschnitt
-        device_grp = QGroupBox("Gerät")
-        device_l = QFormLayout(device_grp)
+        def _form(grp: QGroupBox) -> QFormLayout:
+            """Erzeugt ein gut ausgerichtetes QFormLayout für eine GroupBox."""
+            fl = QFormLayout(grp)
+            fl.setContentsMargins(16, 16, 16, 16)
+            fl.setSpacing(12)
+            fl.setHorizontalSpacing(20)
+            fl.setFieldGrowthPolicy(
+                QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow
+            )
+            return fl
 
+        # ── Gerät ─────────────────────────────────────────────────────────────
+        device_grp = QGroupBox("Gerät")
+        device_l = _form(device_grp)
         self._dev_name_lbl = QLabel("AJAZZ AKP03E")
         self._dev_conn_lbl = QLabel("—")
         device_l.addRow("Modell:", self._dev_name_lbl)
         device_l.addRow("Status:", self._dev_conn_lbl)
-
         layout.addWidget(device_grp)
 
-        # Display-Abschnitt
+        # ── Display ────────────────────────────────────────────────────────────
         display_grp = QGroupBox("Display")
-        display_l = QFormLayout(display_grp)
-
+        display_l = _form(display_grp)
         config = cfg.get()
         brightness = config.get("brightness", 80)
-
         bright_row = QHBoxLayout()
+        bright_row.setSpacing(10)
         self._bright_slider = QSlider(Qt.Orientation.Horizontal)
         self._bright_slider.setRange(0, 100)
         self._bright_slider.setValue(brightness)
-        self._bright_slider.setFixedWidth(220)
         self._bright_slider.valueChanged.connect(self._on_brightness_changed)
-
         self._bright_value = QLabel(f"{brightness}%")
-        self._bright_value.setFixedWidth(40)
-        bright_row.addWidget(self._bright_slider)
+        self._bright_value.setFixedWidth(44)
+        bright_row.addWidget(self._bright_slider, 1)
         bright_row.addWidget(self._bright_value)
-        bright_row.addStretch()
-
         display_l.addRow("Helligkeit:", bright_row)
         layout.addWidget(display_grp)
 
-        # Autostart-Abschnitt
+        # ── Autostart ──────────────────────────────────────────────────────────
         autostart_grp = QGroupBox("Autostart")
         autostart_l = QVBoxLayout(autostart_grp)
-        autostart_l.setSpacing(6)
-
+        autostart_l.setContentsMargins(16, 16, 16, 16)
+        autostart_l.setSpacing(8)
         self._autostart_cb = QCheckBox("DeckPad beim Login automatisch starten")
         try:
             import autostart as _as
@@ -600,22 +617,18 @@ class ConfigWindow(QMainWindow):
         except Exception:
             self._autostart_cb.setEnabled(False)
         self._autostart_cb.toggled.connect(self._on_autostart_toggled)
-
         autostart_hint = QLabel(
             "macOS: launchd-Plist in ~/Library/LaunchAgents/\n"
             "Windows: Registrierungseintrag HKCU\\...\\Run"
         )
         autostart_hint.setStyleSheet("color: #636366; font-size: 11px;")
-
         autostart_l.addWidget(self._autostart_cb)
         autostart_l.addWidget(autostart_hint)
         layout.addWidget(autostart_grp)
 
-        # Dante DDM Abschnitt
+        # ── Dante DDM ──────────────────────────────────────────────────────────
         dante_grp = QGroupBox("Dante DDM")
-        dante_l = QFormLayout(dante_grp)
-        dante_l.setSpacing(10)
-
+        dante_l = _form(dante_grp)
         dante_config = cfg.get().get("dante", {})
 
         self._dante_host_edit = QLineEdit()
@@ -633,23 +646,22 @@ class ConfigWindow(QMainWindow):
         self._dante_key_edit.textChanged.connect(self._on_dante_key_changed)
         self._dante_key_toggle = QPushButton("Zeigen")
         self._dante_key_toggle.setObjectName("GhostButton")
-        self._dante_key_toggle.setFixedWidth(76)
+        self._dante_key_toggle.setFixedWidth(80)
         self._dante_key_toggle.setCheckable(True)
         self._dante_key_toggle.clicked.connect(self._toggle_api_key_visibility)
-        key_row.addWidget(self._dante_key_edit)
+        key_row.addWidget(self._dante_key_edit, 1)
         key_row.addWidget(self._dante_key_toggle)
         dante_l.addRow("API-Key:", key_row)
 
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(8)
+        btn_row.setSpacing(12)
         dante_test_btn = QPushButton("Verbindung testen")
         dante_test_btn.setObjectName("GhostButton")
         dante_test_btn.clicked.connect(self._test_dante_connection)
         self._dante_status_lbl = QLabel("")
         self._dante_status_lbl.setStyleSheet("font-size: 12px;")
         btn_row.addWidget(dante_test_btn)
-        btn_row.addWidget(self._dante_status_lbl)
-        btn_row.addStretch()
+        btn_row.addWidget(self._dante_status_lbl, 1)
         dante_l.addRow("", btn_row)
 
         dante_hint = QLabel(
@@ -657,19 +669,22 @@ class ConfigWindow(QMainWindow):
             "Nur im lokalen Netzwerk (TH-OWL) erreichbar."
         )
         dante_hint.setStyleSheet("color: #636366; font-size: 11px;")
+        dante_hint.setWordWrap(True)
         dante_l.addRow("", dante_hint)
-
         layout.addWidget(dante_grp)
 
-        # Info-Abschnitt
+        # ── Info ───────────────────────────────────────────────────────────────
         info_grp = QGroupBox("Info")
-        info_l = QFormLayout(info_grp)
+        info_l = _form(info_grp)
         info_l.addRow("App:", QLabel("DeckPad"))
         info_l.addRow("Version:", QLabel("1.0"))
-        info_l.addRow("Config-Pfad:", QLabel(
+        cfg_path_lbl = QLabel(
             os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                          "data", "config.json")
-        ))
+                         "data", "config.json")
+        )
+        cfg_path_lbl.setWordWrap(True)
+        cfg_path_lbl.setStyleSheet("color: #8e8e93; font-size: 11px;")
+        info_l.addRow("Config-Pfad:", cfg_path_lbl)
         layout.addWidget(info_grp)
 
         layout.addStretch()
