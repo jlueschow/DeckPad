@@ -51,7 +51,7 @@ SCENE_PRODUKTIVITAET = Scene(
                app_path="/Applications/05 Prototyp/Claude.app"),
         Button("Kalender",  "📅", (140, 50, 140),
                lambda: actions.open_app("Calendar"),
-               app_path="/Volumes/Daten Johannes/08 Promotion/04 Software/AJAZZ AKP03E/assets/calendar_icon.png"),
+               app_path="/Users/johannesluschow/kDrive/01 Eigene Programme/DeckPad/assets/calendar_icon.png"),
         Button("Mail",      "✉", (180, 50, 50),
                lambda: actions.open_app("Mail"),
                app_path="/System/Applications/Mail.app"),

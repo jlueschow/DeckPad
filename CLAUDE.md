@@ -113,3 +113,15 @@ Kein Dateiformat-Change. Kein Change an scene_widget.py oder button_editor.py
 - Button-Bibliothek: `data/library/buttons.json`
 - Seiten-Bibliothek: `data/library/pages/`
 - Autostart-Plist (macOS): `~/Library/LaunchAgents/app.deckpad.plist`
+
+## Projekt-Pfad
+
+```
+/Users/johannesluschow/kDrive/01 Eigene Programme/DeckPad/
+```
+
+```bash
+# Starten
+cd "/Users/johannesluschow/kDrive/01 Eigene Programme/DeckPad"
+python3 app_main.py
+```
