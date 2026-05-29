@@ -29,8 +29,9 @@ from PySide6.QtGui import QIcon, QPixmap, QImage, QColor, QPainter, QFont
 from PySide6.QtCore import Qt, QObject, Slot, QTimer
 
 from config.config_manager import cfg
-from app.hid_thread import HIDThread, _run_action, _run_knob_action
-from app.config_window import ConfigWindow
+# HIDThread + ConfigWindow werden lazy importiert:
+#   hid_thread  → in _start_hid()        (spart ~4s auf langsamem Volume)
+#   config_window → in _init_config_window() (spart ~5s auf langsamem Volume)
 from app.log_window import show_log_window
 from log_sink import log
 
@@ -73,10 +74,12 @@ class MenuBarApp(QObject):
 
     def __init__(self, app: QApplication):
         super().__init__()
-        self._app            = app
-        self._config_window  = None
-        self._hid_thread     = None
-        self._status_text    = "Verbinde…"
+        self._app              = app
+        self._config_window    = None
+        self._hid_thread       = None
+        self._run_action       = None   # wird in _start_hid() gesetzt
+        self._run_knob_action  = None
+        self._status_text      = "Verbinde…"
 
         # Kontextmenü-Sicherheit: kein Rebuild / kein HID-Read wenn Menü offen
         self._menu_open      = False
@@ -179,6 +182,7 @@ class MenuBarApp(QObject):
     # ── Lazy-Init ──────────────────────────────────────────────────────────────
 
     def _init_config_window(self):
+        from app.config_window import ConfigWindow   # lazy: spart ~5s auf langsamem Volume
         self._config_window = ConfigWindow()
         self._config_window.scene_changed.connect(self._on_scene_changed_from_ui)
         self._config_window.brightness_changed.connect(self._on_brightness_from_ui)
@@ -186,6 +190,9 @@ class MenuBarApp(QObject):
     # ── HID-Thread ─────────────────────────────────────────────────────────────
 
     def _start_hid(self):
+        from app.hid_thread import HIDThread, _run_action, _run_knob_action  # lazy
+        self._run_action      = _run_action
+        self._run_knob_action = _run_knob_action
         self._hid_thread = HIDThread()
         self._hid_thread.connected.connect(self._on_connected)
         self._hid_thread.disconnected.connect(self._on_disconnected)
@@ -240,7 +247,8 @@ class MenuBarApp(QObject):
             if btn["action"].get("type") == "open_config":
                 self._show_config()
             else:
-                _run_action(btn["action"])
+                if self._run_action:
+                    self._run_action(btn["action"])
 
     @Slot(int, int)
     def _on_knob_action(self, knob_index: int, direction: int):
@@ -252,8 +260,8 @@ class MenuBarApp(QObject):
             return
         knobs = scenes[si].get("knobs", [])
         knob  = next((k for k in knobs if k["index"] == knob_index), None)
-        if knob and knob.get("action"):
-            _run_knob_action(knob["action"], direction)
+        if knob and knob.get("action") and self._run_knob_action:
+            self._run_knob_action(knob["action"], direction)
 
     @Slot(int)
     def _on_knob_press_action(self, knob_index: int):
@@ -278,7 +286,8 @@ class MenuBarApp(QObject):
         if press_action.get("type") == "open_config":
             self._show_config()
         else:
-            _run_action(press_action)
+            if self._run_action:
+                self._run_action(press_action)
 
     # ── Szenen-Wechsel ─────────────────────────────────────────────────────────
 
