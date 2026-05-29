@@ -665,8 +665,7 @@ class ConfigWindow(QMainWindow):
         dante_l.addRow("", btn_row)
 
         dante_hint = QLabel(
-            "API-Key wird im Klartext in config.json gespeichert.\n"
-            "Nur im lokalen Netzwerk (TH-OWL) erreichbar."
+            "API-Key wird im Klartext in config.json gespeichert."
         )
         dante_hint.setStyleSheet("color: #636366; font-size: 11px;")
         dante_hint.setWordWrap(True)
