@@ -624,17 +624,33 @@ class ConfigWindow(QMainWindow):
         self._dante_host_edit.textChanged.connect(self._on_dante_host_changed)
         dante_l.addRow("DDM Host:", self._dante_host_edit)
 
+        key_row = QHBoxLayout()
+        key_row.setSpacing(6)
         self._dante_key_edit = QLineEdit()
         self._dante_key_edit.setPlaceholderText("API-Key")
         self._dante_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self._dante_key_edit.setText(dante_config.get("api_key", ""))
         self._dante_key_edit.textChanged.connect(self._on_dante_key_changed)
-        dante_l.addRow("API-Key:", self._dante_key_edit)
+        self._dante_key_toggle = QPushButton("Zeigen")
+        self._dante_key_toggle.setObjectName("GhostButton")
+        self._dante_key_toggle.setFixedWidth(76)
+        self._dante_key_toggle.setCheckable(True)
+        self._dante_key_toggle.clicked.connect(self._toggle_api_key_visibility)
+        key_row.addWidget(self._dante_key_edit)
+        key_row.addWidget(self._dante_key_toggle)
+        dante_l.addRow("API-Key:", key_row)
 
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
         dante_test_btn = QPushButton("Verbindung testen")
         dante_test_btn.setObjectName("GhostButton")
         dante_test_btn.clicked.connect(self._test_dante_connection)
-        dante_l.addRow("", dante_test_btn)
+        self._dante_status_lbl = QLabel("")
+        self._dante_status_lbl.setStyleSheet("font-size: 12px;")
+        btn_row.addWidget(dante_test_btn)
+        btn_row.addWidget(self._dante_status_lbl)
+        btn_row.addStretch()
+        dante_l.addRow("", btn_row)
 
         dante_hint = QLabel(
             "API-Key wird im Klartext in config.json gespeichert.\n"
@@ -683,12 +699,22 @@ class ConfigWindow(QMainWindow):
             self._hid_thread.set_brightness_now(value)
 
     def _on_dante_host_changed(self, text: str):
-        cfg.get().setdefault("dante", {})["host"] = text
+        cfg.get().setdefault("dante", {})["host"] = text.strip()
         cfg.save()
+        self._dante_status_lbl.setText("")
 
     def _on_dante_key_changed(self, text: str):
         cfg.get().setdefault("dante", {})["api_key"] = text
         cfg.save()
+        self._dante_status_lbl.setText("")
+
+    def _toggle_api_key_visibility(self, checked: bool):
+        if checked:
+            self._dante_key_edit.setEchoMode(QLineEdit.EchoMode.Normal)
+            self._dante_key_toggle.setText("Verbergen")
+        else:
+            self._dante_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+            self._dante_key_toggle.setText("Zeigen")
 
     def _test_dante_connection(self):
         import urllib.request
@@ -698,11 +724,11 @@ class ConfigWindow(QMainWindow):
         host    = dante_cfg.get("host", "").rstrip("/")
         api_key = dante_cfg.get("api_key", "")
         if not host:
-            QMessageBox.warning(
-                self, "Dante DDM",
-                "Bitte zuerst einen DDM Host eintragen (z. B. http://172.17.113.10)."
-            )
+            self._dante_status_lbl.setText("Kein Host eingetragen.")
+            self._dante_status_lbl.setStyleSheet("color: #ff6b6b; font-size: 12px;")
             return
+        self._dante_status_lbl.setText("Verbinde…")
+        self._dante_status_lbl.setStyleSheet("color: #636366; font-size: 12px;")
         try:
             req = urllib.request.Request(
                 f"{host}/graphql",
@@ -717,18 +743,16 @@ class ConfigWindow(QMainWindow):
             with urllib.request.urlopen(req, timeout=5) as resp:
                 data = _json.loads(resp.read().decode("utf-8"))
             domains = [d["name"] for d in data.get("data", {}).get("domains", [])]
-            QMessageBox.information(
-                self, "Dante DDM",
-                f"Verbindung erfolgreich!\nDomains: {', '.join(domains)}"
+            self._dante_status_lbl.setText(
+                f"✓ Verbunden  — Domains: {', '.join(domains)}"
             )
+            self._dante_status_lbl.setStyleSheet("color: #a6e3a1; font-size: 12px;")
         except urllib.error.URLError as e:
-            QMessageBox.critical(
-                self, "Dante DDM", f"DDM nicht erreichbar:\n{e.reason}"
-            )
+            self._dante_status_lbl.setText(f"Nicht erreichbar: {e.reason}")
+            self._dante_status_lbl.setStyleSheet("color: #ff6b6b; font-size: 12px;")
         except Exception as e:
-            QMessageBox.critical(
-                self, "Dante DDM", f"Verbindung fehlgeschlagen:\n{e}"
-            )
+            self._dante_status_lbl.setText(f"Fehler: {e}")
+            self._dante_status_lbl.setStyleSheet("color: #ff6b6b; font-size: 12px;")
 
     def update_device_status(self, connected: bool, message: str = ""):
         self.set_connected(connected)
