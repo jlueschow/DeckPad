@@ -1,5 +1,33 @@
 # DeckPad — Projektkontext für Claude
 
+## Vault – Single Source of Truth
+
+Das gesamte Projektwissen lebt im Obsidian Vault. Claude Code liest und schreibt dort direkt.
+
+**Vault-Basis:**
+`/Users/johannesluschow/kDrive/00 zweites Gehirn Obsidian/Zweites Gehirn/`
+
+### Wichtigste Regel: Vault zuerst
+Bei **jeder** projektbezogenen Anfrage (Status, offene Aufgaben, Bugs, Entscheidungen) **immer zuerst die Vault-Dateien lesen** — nie zuerst den Code durchsuchen. Der Vault ist die einzige Quelle der Wahrheit. Quellcode nur lesen wenn eine konkrete Implementierungsaufgabe vorliegt.
+
+### Beim Session-Start immer lesen
+- `03 Projekte/Privat/AJAZZ AKP03E.md` — aktueller Status, offene Aufgaben, bekannte Bugs, Architektur
+- `03 Projekte/Privat/AJAZZ AKP03E – GitHub Vorbereitung.md` — GitHub-Entscheidungen, Branding
+
+### Bei Bedarf lesen
+| Kontext | Datei |
+|---|---|
+| Bekannte macOS/PySide6 Bugs | `05 Ressourcen/macOS PySide6 Qt Bug Patterns.md` |
+| Dante-Integration (DDM API) | `03 Projekte/TH OWL/Doktorarbeit/Prototyp – Dante Voice Control.md` |
+| Copyright-Regeln Icons/Symbole | Abschnitt „Copyright-Regel" in `AJAZZ AKP03E.md` |
+
+### Vault schreiben
+- Neuen Bug gefunden → in `AJAZZ AKP03E.md` unter „Bekannte Bugs & Fixes" eintragen
+- Task erledigt → Checkbox in `AJAZZ AKP03E.md` auf `[x]` setzen
+- Session beendet → „Wo wir beim nächsten Mal weitermachen" und „Prompt für nächste Session" aktualisieren
+
+---
+
 ## Was ist das?
 
 **DeckPad** — macOS/Windows Menu-Bar-App für den AJAZZ AKP03E Macro-Pad.

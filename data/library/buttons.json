@@ -52,6 +52,48 @@
         {"id": "new_tab",    "label": "Neuer Tab",   "icon": {"type": "file", "path": "assets/icons/new_tab.png"},    "action": {"type": "shortcut", "keys": "cmd+t"}},
         {"id": "close_tab",  "label": "Tab zu",      "icon": {"type": "file", "path": "assets/icons/close_tab.png"},  "action": {"type": "shortcut", "keys": "cmd+w"}}
       ]
+    },
+    {
+      "id": "dante",
+      "name": "Dante",
+      "buttons": [
+        {
+          "id": "dante_voice_toggle",
+          "label": "Voice Chat",
+          "icon": {"type": "symbol", "name": "mic"},
+          "action": {
+            "type": "shortcut",
+            "keys": "ctrl+shift+d"
+          }
+        },
+        {
+          "id": "dante_template_1",
+          "label": "Dante Route 1",
+          "icon": {"type": "symbol", "name": "network"},
+          "action": {
+            "type": "dante_route",
+            "routes": []
+          }
+        },
+        {
+          "id": "dante_template_2",
+          "label": "Dante Route 2",
+          "icon": {"type": "symbol", "name": "network"},
+          "action": {
+            "type": "dante_route",
+            "routes": []
+          }
+        },
+        {
+          "id": "dante_template_3",
+          "label": "Dante Route 3",
+          "icon": {"type": "symbol", "name": "network"},
+          "action": {
+            "type": "dante_route",
+            "routes": []
+          }
+        }
+      ]
     }
   ]
 }

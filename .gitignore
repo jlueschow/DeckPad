@@ -31,6 +31,9 @@ data/library/pages/*
 # Werden beim ersten App-Start automatisch generiert (create_library_icons.py).
 assets/icons/
 
+# App-Icon-Backups (aus .app-Bundles extrahiert, urheberrechtlich geschützt — nicht einzuchecken)
+assets/icons_backup/
+
 # macOS
 .DS_Store
 .AppleDouble

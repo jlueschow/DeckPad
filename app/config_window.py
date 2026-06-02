@@ -718,7 +718,7 @@ class ConfigWindow(QMainWindow):
         self._dante_status_lbl.setText("")
 
     def _on_dante_key_changed(self, text: str):
-        cfg.get().setdefault("dante", {})["api_key"] = text
+        cfg.get().setdefault("dante", {})["api_key"] = text.strip()
         cfg.save()
         self._dante_status_lbl.setText("")
 
@@ -731,42 +731,52 @@ class ConfigWindow(QMainWindow):
             self._dante_key_toggle.setText("Zeigen")
 
     def _test_dante_connection(self):
+        import threading
         import urllib.request
         import urllib.error
         import json as _json
+
         dante_cfg = cfg.get().get("dante", {})
-        host    = dante_cfg.get("host", "").rstrip("/")
-        api_key = dante_cfg.get("api_key", "")
+        host    = dante_cfg.get("host", "").strip().rstrip("/")
+        api_key = dante_cfg.get("api_key", "").strip()
+
         if not host:
             self._dante_status_lbl.setText("Kein Host eingetragen.")
             self._dante_status_lbl.setStyleSheet("color: #ff6b6b; font-size: 12px;")
             return
+
         self._dante_status_lbl.setText("Verbinde…")
         self._dante_status_lbl.setStyleSheet("color: #636366; font-size: 12px;")
-        try:
-            req = urllib.request.Request(
-                f"{host}/graphql",
-                data=b'{"query":"{ domains { name } }"}',
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": api_key,
-                    "User-Agent": "PostmanRuntime/7.45.0",
-                },
-                method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                data = _json.loads(resp.read().decode("utf-8"))
-            domains = [d["name"] for d in data.get("data", {}).get("domains", [])]
-            self._dante_status_lbl.setText(
-                f"✓ Verbunden  — Domains: {', '.join(domains)}"
-            )
-            self._dante_status_lbl.setStyleSheet("color: #a6e3a1; font-size: 12px;")
-        except urllib.error.URLError as e:
-            self._dante_status_lbl.setText(f"Nicht erreichbar: {e.reason}")
-            self._dante_status_lbl.setStyleSheet("color: #ff6b6b; font-size: 12px;")
-        except Exception as e:
-            self._dante_status_lbl.setText(f"Fehler: {e}")
-            self._dante_status_lbl.setStyleSheet("color: #ff6b6b; font-size: 12px;")
+
+        def test_in_thread():
+            try:
+                req = urllib.request.Request(
+                    f"{host}/graphql",
+                    data=b'{"query":"{ domains { name } }"}',
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": api_key,
+                        "User-Agent": "PostmanRuntime/7.45.0",
+                    },
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = _json.loads(resp.read().decode("utf-8"))
+                domains = [d["name"] for d in data.get("data", {}).get("domains", [])]
+                # Update UI vom Main-Thread
+                self._dante_status_lbl.setText(
+                    f"• Verbunden  — Domains: {', '.join(domains)}"
+                )
+                self._dante_status_lbl.setStyleSheet("color: #a6e3a1; font-size: 12px;")
+            except urllib.error.URLError as e:
+                self._dante_status_lbl.setText(f"Nicht erreichbar: {e.reason}")
+                self._dante_status_lbl.setStyleSheet("color: #ff6b6b; font-size: 12px;")
+            except Exception as e:
+                self._dante_status_lbl.setText(f"Fehler: {str(e)[:50]}")
+                self._dante_status_lbl.setStyleSheet("color: #ff6b6b; font-size: 12px;")
+
+        thread = threading.Thread(target=test_in_thread, daemon=True)
+        thread.start()
 
     def update_device_status(self, connected: bool, message: str = ""):
         self.set_connected(connected)

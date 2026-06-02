@@ -78,12 +78,15 @@ a = Analysis(
         "Quartz",
         "Quartz.CoreGraphics",
         "CoreFoundation",
+        # urllib braucht email (für Header-Verarbeitung)
+        "email",
+        "email.mime",
     ] + _pyobjc_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        "tkinter", "unittest", "email", "html", "http",
+        "tkinter", "unittest",
         "xmlrpc", "pydoc", "doctest", "difflib",
         "matplotlib", "numpy", "scipy", "pandas",
     ],
