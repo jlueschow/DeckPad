@@ -413,3 +413,25 @@ def dante_route(routes: list, host: str, api_key: str) -> str:
     summary = f"{len(results)} Route(n) gesetzt: " + "; ".join(results)
     log(f"dante_route ▶ {summary}")
     return summary
+
+
+# ── Dante Voice Control (TCP-IPC) ──────────────────────────────────────────────
+def dante_voice_toggle():
+    """
+    Sendet Kommando an Dante Voice Control (localhost:9999).
+    Startet/stoppt Sprachaufnahme und -verarbeitung.
+    """
+    import socket
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        sock.connect(('localhost', 9999))
+        sock.send("toggle_recording".encode('utf-8'))
+        sock.close()
+        log("dante_voice ▶ toggle_recording gesendet")
+        return "Dante Voice Control: Aufnahme gestartet/gestoppt"
+    except (ConnectionRefusedError, TimeoutError, OSError) as e:
+        msg = f"Dante Voice Control nicht erreichbar: {e}"
+        log(f"dante_voice ✗ {msg}")
+        return msg

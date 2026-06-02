@@ -316,6 +316,13 @@ def _run_action(action: dict):
     elif atype == "shell":
         import subprocess
         subprocess.Popen(action.get("command", ""), shell=True)
+    elif atype == "dante_voice_toggle":
+        try:
+            result = actions.dante_voice_toggle()
+            log(f"dante_voice ▶ {result}")
+        except Exception as e:
+            log(f"dante_voice ✗ FEHLER: {e}")
+            print(f"[dante_voice_toggle] Fehler: {e}")
     elif atype == "dante_route":
         dante_cfg = cfg.get().get("dante", {})
         # Backward-Compat: altes Single-Route-Format → routes-Liste

@@ -22,13 +22,14 @@ from config.config_manager import cfg
 # ── Action-Typen ───────────────────────────────────────────────────────────────
 
 ACTION_TYPES = [
-    ("open_app",       "App öffnen"),
-    ("open_url",       "URL öffnen"),
-    ("shortcut",       "Tastenkürzel"),
-    ("shell",          "Terminal-Befehl"),
-    ("dante_route",    "Dante Routing"),
-    ("open_config",    "Einstellungen öffnen"),
-    ("none",           "Keine Aktion"),
+    ("open_app",              "App öffnen"),
+    ("open_url",              "URL öffnen"),
+    ("shortcut",              "Tastenkürzel"),
+    ("shell",                 "Terminal-Befehl"),
+    ("dante_route",           "Dante Routing"),
+    ("dante_voice_toggle",    "Dante Voice Control"),
+    ("open_config",           "Einstellungen öffnen"),
+    ("none",                  "Keine Aktion"),
 ]
 
 ICON_TYPES = [
@@ -1058,6 +1059,8 @@ class ButtonEditorDialog(QDialog):
                     for r in self._dante_route_rows
                 ],
             }
+        elif atype_key == "dante_voice_toggle":
+            data["action"] = {"type": "dante_voice_toggle"}
         elif atype_key == "open_config":
             data["action"] = {"type": "open_config"}
         else:

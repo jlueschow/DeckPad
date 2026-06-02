@@ -632,7 +632,7 @@ class ConfigWindow(QMainWindow):
         dante_config = cfg.get().get("dante", {})
 
         self._dante_host_edit = QLineEdit()
-        self._dante_host_edit.setPlaceholderText("http://172.17.113.10")
+        self._dante_host_edit.setPlaceholderText("http://localhost:8080")
         self._dante_host_edit.setText(dante_config.get("host", ""))
         self._dante_host_edit.textChanged.connect(self._on_dante_host_changed)
         dante_l.addRow("DDM Host:", self._dante_host_edit)
