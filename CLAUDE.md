@@ -112,9 +112,57 @@ steckt in `Assets.car`. `_find_icns()` gibt None zurück → alter Code warf
 Kein Dateiformat-Change. Kein Change an scene_widget.py oder button_editor.py
 (außer einem Hinweis-Label im App-Icon-Panel). Commit: `ad392ed`.
 
-## Aktueller Stand (Mai 2026)
+## Task-Synchronisierung mit Vault
 
-### Fertig
+**Wenn während dieser CC-Session neue Tasks entstehen oder sich bestehende Tasks ändern:**
+
+Dokumentiere am Session-Ende:
+```
+Tasks entstanden/geändert:
+- [todo/in_progress/done] Task-Name
+- [todo/in_progress/done] Task-Name
+```
+
+→ **Claudian synchronisiert automatisch** in [[03 Projekte/Privat/DeckPad – Dante Voice Control Integration]]
+
+Einfach aufzählen, die Automation macht den Rest.
+
+---
+
+## Automatische Task-Status-Prüfung
+
+### Beim Session-Start (automatisch)
+1. Lese die Vault-Projektdatei: `[[03 Projekte/Privat/DeckPad – Dante Voice Control Integration]]`
+2. Parse die `tasks:` Array
+3. Rapportiere: "Aktuelle Tasks im Dashboard:"
+   ```
+   ☐ Todo (X Tasks):  Task A, Task B, …
+   🟡 In Progress (Y Tasks): Task C, …
+   ✅ Done (Z Tasks): Task D, …
+   ```
+4. Kurze Analyse: "Was ist der aktuelle Code-Status zu diesen Tasks?"
+
+### Während der Session
+- Wenn Code-Änderungen gemacht werden: kontinuierlich prüfen „Ist diese Task jetzt erledigt?"
+- Rapportiere: `✅ Task X implementiert & getestet → Status wird auf 'done' gesetzt`
+- Oder: `🟡 Task Y begonnen → Status: 'in_progress'`
+
+### Am Ende der Session (automatisch)
+Generiere einen Task-Update-Report:
+```
+Task-Status-Änderungen:
+- Task A: todo → in_progress
+- Task B: in_progress → done
+- Task C: todo (nicht gestartet)
+```
+
+→ **Claudian synchronisiert diese Updates automatisch ins Vault**
+
+---
+
+## Aktueller Stand (Juni 2026, Phase 6 + 7)
+
+### ✅ Fertig
 - Grundfunktion: Buttons, Knobs (drehen + drücken), Nav-Buttons
 - Konfigurationsfenster: Szenen, Button-Editor, Knob-Editor, Settings
 - Button-Bibliothek (library_panel + in ButtonEditorDialog + KnobEditorDialog)
@@ -127,13 +175,27 @@ Kein Dateiformat-Change. Kein Change an scene_widget.py oder button_editor.py
 - Scroll-Aktion für Knob (alle drei CGEvent-Delta-Felder, Browser-kompatibel)
 - Accessibility-Check beim Start (AXIsProcessTrusted + Dialog mit Link)
 - System-App-Icon-Extraktion (NSWorkspace, für Calendar/Notes/Reminders)
+- **App-Bundle bauen (PyInstaller)** — v0.1.0 gebaut + installiert ✅
+- **Drag & Drop in Button-Slots** — LCD-Buttons und Knobs tauschbar ✅ (Commit 599e237)
+- **README-Screenshots** — 3 Screenshots in docs/screenshots/ ✅ (Commit 0c46178)
+- **Phase 6 — Dante DDM Integration** ✅
+  - `dante_route` Aktionstyp mit Multi-Routen per Button
+  - Settings-Tab mit Host/API-Key + Validierung ("Verbindung testen")
+  - Button-Bibliothek erweitert: Kategorie "Dante" (Voice Chat + 3 Route-Templates)
+  - 7 Commits gepusht zu GitHub (2026-06-03)
+- **Phase 7 — Dante Voice Control Integration** ✅ (Grundgerüst)
+  - `dante_voice_toggle()` Action für TCP-Socket (localhost:9999)
+  - UI: neuer Action-Typ "Dante Voice Control" im Button-Editor
 
-### Ausstehend
-- App-Bundle bauen (PyInstaller) — nächster geplanter Schritt
-- Drag & Drop in Button-Slots
-- README-Screenshots für GitHub
-- Gatekeeper / Notarisierung
-- Bug: Downloads-Ordner-Permission (GitHub Issue #1, low priority)
+### ⏳ Ausstehend
+- **Windows-Build** — PyInstaller `.exe` + Test
+- **Gatekeeper / Notarisierung** — Codesignatur + macOS Notarisierung
+- **Phase 7 Ausbau:**
+  - Status-IPC: dante_app.py sendet REC/BEREIT/FEHLER zu DeckPad
+  - Button-Display zeigt Status per Farbe/Label
+  - Preset-Buttons: feste Routing-Presets ohne Sprache
+  - "Disconnect All"-Taste
+- **Bug 13:** Downloads-Ordner-Permission (GitHub Issue #1, niedrige Prio)
 
 ## Daten
 
